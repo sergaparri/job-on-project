@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications - JOB-ON</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/profile.css">
+    <link rel="stylesheet" href="css/notifications.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body class="profile-page">
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="logo">
+                <img src="images/logo.svg" alt="JOB-ON" class="nav-logo">
+            </div>
+            <ul class="nav-links">
+                <li>
+                    <a href="/"><span class="material-icons">home</span>Home</a>
+                </li>
+                <li class="active">
+                    <a href="/notifications.html"><span class="material-icons">notifications</span>Notifications</a>
+                </li>
+                <li>
+                    <a href="/employer-profile.html"><span class="material-icons">business</span>Profile</a>
+                </li>
+                <li>
+                    <a href="/post-job.html"><span class="material-icons">work</span>Post Job</a>
+                </li>
+                <li>
+                    <a href="#"><span class="material-icons">settings</span>Settings</a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="notifications-container">
+                <div class="notifications-header">
+                    <h1>Job Applications</h1>
+                    <div class="filter-buttons">
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="pending">Pending</button>
+                        <button class="filter-btn" data-filter="accepted">Accepted</button>
+                        <button class="filter-btn" data-filter="rejected">Rejected</button>
+                    </div>
+                </div>
+
+                <div id="notificationsList" class="notifications-list">
+                    <!-- Notifications will be dynamically added here -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Check authentication
+        const token = localStorage.getItem('token');
+        const userType = localStorage.getItem('userType');
+
+        if (!token || userType !== 'employer') {
+            window.location.href = '/';
+        }
+
+        // DOM Elements
+        const notificationsList = document.getElementById('notificationsList');
+        const filterButtons = document.querySelectorAll('.filter-btn');
+
+        // Load notifications
+        async function loadNotifications() {
+            try {
+                console.log('Loading notifications...');
+                const response = await fetch('/api/notifications', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+                if (!response.ok) {
+                    throw new Error('Failed to load notifications');
+                }
+
+                const contentType = response.headers.get('content-type');
+                console.log('Content-Type:', contentType);
+
+                let notifications;
+                try {
+                    const textResponse = await response.text();
+                    console.log('Raw response:', textResponse);
+                    notifications = JSON.parse(textResponse);
+                } catch (parseError) {
+                    console.error('JSON Parse Error:', parseError);
+                    throw new Error('Failed to parse notifications');
+                }
+
+                console.log('Notifications loaded:', notifications);
+                displayNotifications(notifications);
+            } catch (error) {
+                console.error('Error loading notifications:', error);
+                notificationsList.innerHTML = `
+                    <div class="error-message">
+                        <span class="material-icons">error_outline</span>
+                        <p>Failed to load notifications. Please try again later.</p>
+                        <button onclick="loadNotifications()" class="retry-btn">
+                            <span class="material-icons">refresh</span>
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // Display notifications
+        function displayNotifications(notifications) {
+            const currentFilter = document.querySelector('.filter-btn.active').dataset.filter;
+            
+            const filteredNotifications = currentFilter === 'all' 
+                ? notifications 
+                : notifications.filter(n => n.status === currentFilter);
+
+            notificationsList.innerHTML = filteredNotifications.map(notification => `
+                <div class="notification-card ${notification.isRead ? 'read' : 'unread'}" data-id="${notification.id}">
+                    <div class="notification-header">
+                        <h3>${notification.jobTitle}</h3>
+                        <span class="status-badge ${notification.status}">${notification.status}</span>
+                    </div>
+                    <div class="notification-content">
+                        <div class="applicant-info">
+                            <p><span class="material-icons">person</span> ${notification.applicant.name}</p>
+                            <p><span class="material-icons">email</span> ${notification.applicant.email}</p>
+                            ${notification.applicant.resumeUrl ? 
+                                `<a href="${notification.applicant.resumeUrl}" target="_blank" class="resume-link">
+                                    <span class="material-icons">description</span> View Resume
+                                </a>` : 
+                                '<p class="no-resume">No resume uploaded</p>'
+                            }
+                        </div>
+                        <div class="notification-actions">
+                            ${notification.status === 'pending' ? `
+                                <button onclick="updateStatus(${notification.id}, 'accepted')" class="action-btn accept">
+                                    <span class="material-icons">check_circle</span> Accept
+                                </button>
+                                <button onclick="updateStatus(${notification.id}, 'rejected')" class="action-btn reject">
+                                    <span class="material-icons">cancel</span> Reject
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                    <div class="notification-footer">
+                        <span class="timestamp">Applied ${timeAgo(new Date(notification.createdAt))}</span>
+                    </div>
+                </div>
+            `).join('') || '<p class="no-notifications">No notifications found</p>';
+        }
+
+        // Update application status
+        async function updateStatus(notificationId, status) {
+            try {
+                const response = await fetch(`/api/notifications/${notificationId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to update status');
+                }
+
+                // Reload notifications
+                loadNotifications();
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to update application status. Please try again.');
+            }
+        }
+
+        // Mark notification as read
+        async function markAsRead(notificationId) {
+            try {
+                await fetch(`/api/notifications/${notificationId}/read`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Time ago function
+        function timeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            let interval = seconds / 31536000;
+            
+            if (interval > 1) return Math.floor(interval) + ' years ago';
+            interval = seconds / 2592000;
+            if (interval > 1) return Math.floor(interval) + ' months ago';
+            interval = seconds / 86400;
+            if (interval > 1) return Math.floor(interval) + ' days ago';
+            interval = seconds / 3600;
+            if (interval > 1) return Math.floor(interval) + ' hours ago';
+            interval = seconds / 60;
+            if (interval > 1) return Math.floor(interval) + ' minutes ago';
+            return Math.floor(seconds) + ' seconds ago';
+        }
+
+        // Filter handlers
+        filterButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                loadNotifications();
+            });
+        });
+
+        // Mark notification as read when clicked
+        notificationsList.addEventListener('click', event => {
+            const card = event.target.closest('.notification-card');
+            if (card && !card.classList.contains('read')) {
+                markAsRead(card.dataset.id);
+                card.classList.add('read');
+            }
+        });
+
+        // Load notifications when page loads
+        loadNotifications();
+    </script>
+</body>
+</html> 

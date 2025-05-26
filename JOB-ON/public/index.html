@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - JOB-ON</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/home.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body class="home-page">
+    <div class="app-container">
+        <!-- Mobile Menu Toggle -->
+        <button class="menu-toggle" id="menuToggle">
+            <span class="material-icons">menu</span>
+        </button>
+
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar" id="sidebar">
+            <div class="logo">
+                <img src="images/logo.svg" alt="JOB-ON" class="nav-logo">
+            </div>
+            <ul class="nav-links">
+                <li class="active">
+                    <a href="/"><span class="material-icons">home</span>Home</a>
+                </li>
+                <li>
+                    <a href="/notifications.html"><span class="material-icons">notifications</span>Notifications</a>
+                </li>
+                <li>
+                    <a href="/seeker-profile.html"><span class="material-icons">person</span>Profile</a>
+                </li>
+                <li>
+                    <a href="/post-job.html"><span class="material-icons">work</span>Post Job</a>
+                </li>
+                <li>
+                    <a href="#"><span class="material-icons">settings</span>Settings</a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="jobs-container">
+                <div class="jobs-header">
+                    <h1>Available Jobs</h1>
+                    <a href="/post-job.html" class="post-job-btn">
+                        <span class="material-icons">add</span>
+                        Post a Job
+                    </a>
+                </div>
+
+                <div class="search-bar">
+                    <div class="search-input">
+                        <span class="material-icons">search</span>
+                        <input type="text" id="searchInput" placeholder="Search jobs by title, company, or location">
+                    </div>
+                    <button class="filter-btn">
+                        <span class="material-icons">filter_list</span>
+                        Filters
+                    </button>
+                </div>
+
+                <div id="jobsList" class="jobs-list">
+                    <!-- Jobs will be loaded here -->
+                    <div class="loading-spinner">
+                        <span class="material-icons rotating">refresh</span>
+                        <p>Loading jobs...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Job Card Template -->
+    <template id="jobCardTemplate">
+        <div class="job-card">
+            <div class="job-card-header">
+                <h2 class="job-title"></h2>
+                <span class="job-location">
+                    <span class="material-icons">location_on</span>
+                    <span class="location-text"></span>
+                </span>
+            </div>
+            
+            <div class="company-info">
+                <h3 class="company-name"></h3>
+                <p class="company-description"></p>
+            </div>
+
+            <div class="job-details">
+                <p class="job-description"></p>
+                
+                <div class="job-meta">
+                    <span class="salary-range">
+                        <span class="material-icons">payments</span>
+                        <span class="salary-text"></span>
+                    </span>
+                    <span class="people-needed">
+                        <span class="material-icons">groups</span>
+                        <span class="people-text"></span>
+                    </span>
+                </div>
+            </div>
+
+            <div class="job-footer">
+                <div class="posted-by">
+                    <span class="material-icons">person</span>
+                    Posted by <span class="poster-name"></span>
+                </div>
+                <button class="apply-btn">
+                    <span class="material-icons">send</span>
+                    Apply Now
+                </button>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        // Check authentication
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+
+        // DOM Elements
+        const jobsList = document.getElementById('jobsList');
+        const jobCardTemplate = document.getElementById('jobCardTemplate');
+        const searchInput = document.getElementById('searchInput');
+        const menuToggle = document.getElementById('menuToggle');
+        const sidebar = document.getElementById('sidebar');
+
+        // Mobile menu toggle
+        menuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('active');
+            document.body.classList.toggle('menu-open');
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (sidebar.classList.contains('active') && 
+                !sidebar.contains(e.target) && 
+                !menuToggle.contains(e.target)) {
+                sidebar.classList.remove('active');
+                document.body.classList.remove('menu-open');
+            }
+        });
+
+        // Format salary
+        function formatSalary(amount) {
+            return new Intl.NumberFormat('en-PH', {
+                style: 'currency',
+                currency: 'PHP'
+            }).format(amount);
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = now - date;
+            const seconds = Math.floor(diff / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            const days = Math.floor(hours / 24);
+
+            if (days > 0) {
+                return `${days} day${days > 1 ? 's' : ''} ago`;
+            } else if (hours > 0) {
+                return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+            } else if (minutes > 0) {
+                return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+            } else {
+                return 'Just now';
+            }
+        }
+
+        // Create job card
+        function createJobCard(job) {
+            console.log('Creating job card with data:', job); // Debug log
+            const card = jobCardTemplate.content.cloneNode(true);
+            
+            // Fill in the job details
+            card.querySelector('.job-title').textContent = job.title;
+            card.querySelector('.location-text').textContent = job.location;
+            card.querySelector('.company-name').textContent = job.company.name;
+            card.querySelector('.company-description').textContent = job.company.description;
+            card.querySelector('.job-description').textContent = job.description;
+            card.querySelector('.salary-text').textContent = 
+                `${formatSalary(job.salaryRange.min)} - ${formatSalary(job.salaryRange.max)}`;
+            card.querySelector('.people-text').textContent = 
+                `${job.numberOfPeople} ${job.numberOfPeople > 1 ? 'people' : 'person'} needed`;
+            card.querySelector('.poster-name').textContent = `${job.employer.name} • ${formatDate(job.createdAt)}`;
+
+            // Add apply button handler
+            const applyBtn = card.querySelector('.apply-btn');
+            if (applyBtn) {
+                // Store job ID as a data attribute
+                applyBtn.dataset.jobId = job.id;
+                
+                applyBtn.addEventListener('click', async () => {
+                    try {
+                        const jobId = applyBtn.dataset.jobId;
+                        console.log('Applying for job:', jobId);
+                        
+                        // Disable button and show loading state
+                        applyBtn.disabled = true;
+                        applyBtn.innerHTML = '<span class="material-icons rotating">refresh</span> Applying...';
+
+                        // Remove any existing messages
+                        const existingMessages = applyBtn.parentElement.querySelectorAll('.success-message, .error-message');
+                        existingMessages.forEach(msg => msg.remove());
+
+                        // Make sure we have a valid job ID
+                        if (!jobId) {
+                            throw new Error('Invalid job ID');
+                        }
+
+                        const response = await fetch(`/api/jobs/${jobId}/apply`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({})
+                        });
+
+                        console.log('Response status:', response.status);
+                        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+                        console.log('Request URL:', response.url); // Debug log
+
+                        const contentType = response.headers.get('content-type');
+                        console.log('Content-Type:', contentType);
+
+                        if (!contentType || !contentType.includes('application/json')) {
+                            console.error('Invalid content type:', contentType);
+                            throw new Error('Server sent an invalid response format');
+                        }
+
+                        const textResponse = await response.text();
+                        console.log('Raw response:', textResponse);
+
+                        if (!textResponse) {
+                            throw new Error('Server sent an empty response');
+                        }
+
+                        let data;
+                        try {
+                            data = JSON.parse(textResponse);
+                        } catch (parseError) {
+                            console.error('JSON Parse Error:', parseError);
+                            throw new Error('Failed to parse server response');
+                        }
+
+                        if (!response.ok) {
+                            throw new Error(data.error || 'Failed to apply for job');
+                        }
+
+                        // Show success message
+                        const successMessage = document.createElement('div');
+                        successMessage.className = 'success-message';
+                        successMessage.innerHTML = `
+                            <span class="material-icons">check_circle</span>
+                            ${data.message}
+                        `;
+                        applyBtn.parentElement.appendChild(successMessage);
+
+                        // Update button state
+                        applyBtn.innerHTML = '<span class="material-icons">check_circle</span> Applied';
+                        applyBtn.classList.add('applied');
+                        applyBtn.disabled = true;
+
+                        // Remove success message after 3 seconds
+                        setTimeout(() => {
+                            successMessage.remove();
+                        }, 3000);
+
+                    } catch (error) {
+                        console.error('Application Error:', error);
+                        
+                        // Show error message
+                        const errorMessage = document.createElement('div');
+                        errorMessage.className = 'error-message';
+                        errorMessage.innerHTML = `
+                            <span class="material-icons">error_outline</span>
+                            ${error.message}
+                        `;
+                        applyBtn.parentElement.appendChild(errorMessage);
+
+                        // Reset button state
+                        applyBtn.disabled = false;
+                        applyBtn.innerHTML = '<span class="material-icons">send</span> Apply Now';
+
+                        // Remove error message after 3 seconds
+                        setTimeout(() => {
+                            errorMessage.remove();
+                        }, 3000);
+                    }
+                });
+            }
+
+            return card;
+        }
+
+        // Fetch and display jobs
+        async function fetchJobs() {
+            try {
+                const response = await fetch('/api/jobs', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch jobs');
+                }
+
+                const jobs = await response.json();
+                console.log('Fetched jobs:', jobs); // Debug log
+                
+                jobsList.innerHTML = ''; // Clear loading spinner
+
+                if (jobs.length === 0) {
+                    jobsList.innerHTML = `
+                        <div class="no-jobs">
+                            <span class="material-icons">work_off</span>
+                            <p>No jobs available at the moment</p>
+                            <a href="/post-job.html" class="post-job-btn">
+                                <span class="material-icons">add</span>
+                                Post Your First Job
+                            </a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                jobs.forEach(job => {
+                    jobsList.appendChild(createJobCard(job));
+                });
+            } catch (error) {
+                console.error('Error fetching jobs:', error);
+                jobsList.innerHTML = `
+                    <div class="error-message">
+                        <span class="material-icons">error_outline</span>
+                        <p>Failed to load jobs. Please try again later.</p>
+                        <button onclick="fetchJobs()" class="retry-btn">
+                            <span class="material-icons">refresh</span>
+                            Retry
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // Search functionality
+        let searchTimeout;
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const searchTerm = e.target.value.toLowerCase();
+                const jobCards = jobsList.getElementsByClassName('job-card');
+
+                Array.from(jobCards).forEach(card => {
+                    const title = card.querySelector('.job-title').textContent.toLowerCase();
+                    const company = card.querySelector('.company-name').textContent.toLowerCase();
+                    const location = card.querySelector('.location-text').textContent.toLowerCase();
+                    const description = card.querySelector('.job-description').textContent.toLowerCase();
+
+                    if (title.includes(searchTerm) || 
+                        company.includes(searchTerm) || 
+                        location.includes(searchTerm) ||
+                        description.includes(searchTerm)) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            }, 300); // Debounce search for better performance
+        });
+
+        // Load jobs when page loads
+        fetchJobs();
+    </script>
+</body>
+</html> 

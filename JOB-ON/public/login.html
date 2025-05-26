@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - JOB-ON</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/auth.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body class="auth-page">
+    <div class="stars-container">
+        <div id="stars"></div>
+        <div id="stars2"></div>
+        <div id="stars3"></div>
+    </div>
+
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <img src="images/logo.svg" alt="JOB-ON" class="auth-logo">
+                <h1>Welcome Back</h1>
+                <p>Sign in to continue to JOB-ON</p>
+            </div>
+
+            <form id="loginForm" class="auth-form">
+                <div class="form-group">
+                    <label for="email">
+                        <span class="material-icons">email</span>
+                        Email Address
+                    </label>
+                    <input type="email" id="email" name="email" required
+                           placeholder="Enter your email">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">
+                        <span class="material-icons">lock</span>
+                        Password
+                    </label>
+                    <div class="password-input">
+                        <input type="password" id="password" name="password" required
+                               placeholder="Enter your password">
+                        <button type="button" class="toggle-password" aria-label="Toggle password visibility">
+                            <span class="material-icons">visibility_off</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-options">
+                    <label class="remember-me">
+                        <input type="checkbox" id="remember">
+                        <span class="checkmark"></span>
+                        Remember me
+                    </label>
+                    <a href="#" class="forgot-password">Forgot password?</a>
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    <span class="material-icons">login</span>
+                    Sign In
+                </button>
+
+                <div class="auth-footer">
+                    <p>Don't have an account? <a href="/signup.html">Sign up</a></p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Toggle password visibility
+        const togglePassword = document.querySelector('.toggle-password');
+        const passwordInput = document.getElementById('password');
+
+        togglePassword.addEventListener('click', () => {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            togglePassword.querySelector('.material-icons').textContent = 
+                type === 'password' ? 'visibility_off' : 'visibility';
+        });
+
+        // Handle form submission
+        const loginForm = document.getElementById('loginForm');
+        
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Login failed');
+                }
+
+                // Store token and user type
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('userType', data.user_type);
+
+                // Redirect to home page
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Error:', error);
+                alert(error.message || 'Failed to login. Please try again.');
+            }
+        });
+    </script>
+</body>
+</html> 

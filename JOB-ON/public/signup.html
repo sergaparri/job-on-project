@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - JOB-ON</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/auth.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body class="auth-page">
+    <div class="stars-container">
+        <div id="stars"></div>
+        <div id="stars2"></div>
+        <div id="stars3"></div>
+    </div>
+
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <img src="images/logo.svg" alt="JOB-ON" class="auth-logo">
+                <h1>Create Account</h1>
+                <p>Join JOB-ON to find your dream job</p>
+            </div>
+
+            <form id="signupForm" class="auth-form">
+                <div class="form-group">
+                    <label for="firstName">
+                        <span class="material-icons">person</span>
+                        First Name
+                    </label>
+                    <input type="text" id="firstName" name="firstName" required
+                           placeholder="Enter your first name">
+                </div>
+
+                <div class="form-group">
+                    <label for="lastName">
+                        <span class="material-icons">person</span>
+                        Last Name
+                    </label>
+                    <input type="text" id="lastName" name="lastName" required
+                           placeholder="Enter your last name">
+                </div>
+
+                <div class="form-group">
+                    <label for="email">
+                        <span class="material-icons">email</span>
+                        Email Address
+                    </label>
+                    <input type="email" id="email" name="email" required
+                           placeholder="Enter your email">
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">
+                        <span class="material-icons">phone</span>
+                        Phone Number
+                    </label>
+                    <input type="tel" id="phone" name="phone" required
+                           placeholder="Enter your phone number">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">
+                        <span class="material-icons">lock</span>
+                        Password
+                    </label>
+                    <div class="password-input">
+                        <input type="password" id="password" name="password" required
+                               placeholder="Create a password">
+                        <button type="button" class="toggle-password" aria-label="Toggle password visibility">
+                            <span class="material-icons">visibility_off</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPassword">
+                        <span class="material-icons">lock_clock</span>
+                        Confirm Password
+                    </label>
+                    <div class="password-input">
+                        <input type="password" id="confirmPassword" name="confirmPassword" required
+                               placeholder="Confirm your password">
+                        <button type="button" class="toggle-password" aria-label="Toggle password visibility">
+                            <span class="material-icons">visibility_off</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group employer-fields" style="display: none;">
+                    <label for="companyName">
+                        <span class="material-icons">business</span>
+                        Company Name
+                    </label>
+                    <input type="text" id="companyName" name="companyName"
+                           placeholder="Enter your company name">
+                </div>
+
+                <div class="form-group employer-fields" style="display: none;">
+                    <label for="companyDescription">
+                        <span class="material-icons">description</span>
+                        Company Description
+                    </label>
+                    <textarea id="companyDescription" name="companyDescription" rows="4"
+                              placeholder="Describe your company..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="user-type-label">Account Type</label>
+                    <div class="user-type-options">
+                        <label class="user-type-option">
+                            <input type="radio" name="userType" value="job_seeker" checked>
+                            <span class="radio-button"></span>
+                            <span class="material-icons">person_search</span>
+                            Job Seeker
+                        </label>
+                        <label class="user-type-option">
+                            <input type="radio" name="userType" value="employer">
+                            <span class="radio-button"></span>
+                            <span class="material-icons">business</span>
+                            Employer
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group terms">
+                    <label class="remember-me">
+                        <input type="checkbox" id="terms" required>
+                        <span class="checkmark"></span>
+                        I agree to the <a href="#" class="terms-link">Terms & Conditions</a>
+                    </label>
+                </div>
+
+                <button type="submit" class="submit-btn">
+                    <span class="material-icons">person_add</span>
+                    Create Account
+                </button>
+
+                <div class="auth-footer">
+                    <p>Already have an account? <a href="/login.html">Sign in</a></p>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Toggle password visibility
+        document.querySelectorAll('.toggle-password').forEach(button => {
+            button.addEventListener('click', () => {
+                const input = button.parentElement.querySelector('input');
+                const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+                input.setAttribute('type', type);
+                button.querySelector('.material-icons').textContent = 
+                    type === 'password' ? 'visibility_off' : 'visibility';
+            });
+        });
+
+        // Handle user type change
+        const userTypeInputs = document.querySelectorAll('input[name="userType"]');
+        const employerFields = document.querySelectorAll('.employer-fields');
+
+        userTypeInputs.forEach(input => {
+            input.addEventListener('change', () => {
+                const isEmployer = input.value === 'employer';
+                employerFields.forEach(field => {
+                    field.style.display = isEmployer ? 'block' : 'none';
+                    const inputs = field.querySelectorAll('input, textarea');
+                    inputs.forEach(input => {
+                        input.required = isEmployer;
+                    });
+                });
+            });
+        });
+
+        // Handle form submission
+        const signupForm = document.getElementById('signupForm');
+        
+        signupForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (password !== confirmPassword) {
+                alert('Passwords do not match');
+                return;
+            }
+
+            const formData = {
+                first_name: document.getElementById('firstName').value,
+                last_name: document.getElementById('lastName').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value,
+                password: password,
+                user_type: document.querySelector('input[name="userType"]:checked').value
+            };
+
+            // Add company info if employer
+            if (formData.user_type === 'employer') {
+                formData.company_name = document.getElementById('companyName').value;
+                formData.company_description = document.getElementById('companyDescription').value;
+            }
+
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Registration failed');
+                }
+
+                alert('Registration successful! Please log in.');
+                window.location.href = '/login.html';
+            } catch (error) {
+                console.error('Error:', error);
+                alert(error.message || 'Failed to register. Please try again.');
+            }
+        });
+    </script>
+</body>
+</html> 

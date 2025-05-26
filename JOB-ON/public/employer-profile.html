@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employer Profile - JOB-ON</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/profile.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body class="profile-page">
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="logo">
+                <img src="images/logo.svg" alt="JOB-ON" class="nav-logo">
+            </div>
+            <ul class="nav-links">
+                <li>
+                    <a href="/"><span class="material-icons">home</span>Home</a>
+                </li>
+                <li>
+                    <a href="/notifications.html"><span class="material-icons">notifications</span>Notifications</a>
+                </li>
+                <li class="active">
+                    <a href="/employer-profile.html"><span class="material-icons">business</span>Profile</a>
+                </li>
+                <li>
+                    <a href="/post-job.html"><span class="material-icons">work</span>Post Job</a>
+                </li>
+                <li>
+                    <a href="#"><span class="material-icons">settings</span>Settings</a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="profile-card">
+                <div class="profile-header">
+                    <h1 id="userName">Loading...</h1>
+                    <button id="logoutBtn" class="logout-btn">
+                        <span class="material-icons">logout</span>
+                        Logout
+                    </button>
+                </div>
+                
+                <div class="profile-info">
+                    <div class="info-item">
+                        <span class="material-icons">email</span>
+                        <span id="userEmail">Loading...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="material-icons">phone</span>
+                        <span id="userPhone">Loading...</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="material-icons">business</span>
+                        <span id="companyName">Loading...</span>
+                    </div>
+                </div>
+
+                <div class="company-info">
+                    <h2>Company Description</h2>
+                    <div class="form-group">
+                        <textarea id="companyDescription" rows="4" placeholder="Describe your company..."></textarea>
+                        <button id="updateCompanyInfo" class="submit-btn">
+                            <span class="material-icons">save</span>
+                            Update Information
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Check authentication
+        const token = localStorage.getItem('token');
+        const userType = localStorage.getItem('userType');
+
+        if (!token || userType !== 'employer') {
+            window.location.href = '/';
+        }
+
+        // DOM Elements
+        const userNameElement = document.getElementById('userName');
+        const userEmailElement = document.getElementById('userEmail');
+        const userPhoneElement = document.getElementById('userPhone');
+        const companyNameElement = document.getElementById('companyName');
+        const companyDescriptionElement = document.getElementById('companyDescription');
+        const updateCompanyInfo = document.getElementById('updateCompanyInfo');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        // Load profile data
+        async function loadProfile() {
+            try {
+                const response = await fetch('/api/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load profile');
+                }
+
+                const data = await response.json();
+                
+                // Update the UI with user data
+                userNameElement.textContent = `${data.firstName} ${data.lastName}`;
+                userEmailElement.textContent = data.email;
+                userPhoneElement.textContent = data.phone || 'Not provided';
+                companyNameElement.textContent = data.companyName || 'Not provided';
+                companyDescriptionElement.value = data.companyDescription || '';
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to load profile data. Please try again later.');
+            }
+        }
+
+        // Update company information
+        updateCompanyInfo.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/update-company', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        description: companyDescriptionElement.value
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to update company information');
+                }
+
+                alert('Company information updated successfully!');
+            } catch (error) {
+                console.error('Error:', error);
+                alert(error.message || 'Failed to update company information');
+            }
+        });
+
+        // Logout handler
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userType');
+            window.location.href = '/';
+        });
+
+        // Load profile when page loads
+        loadProfile();
+    </script>
+</body>
+</html> 

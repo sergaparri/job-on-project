@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - JOB-ON</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/profile.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body class="profile-page">
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="logo">
+                <img src="images/logo.svg" alt="JOB-ON" class="nav-logo">
+            </div>
+            <ul class="nav-links">
+                <li>
+                    <a href="/"><span class="material-icons">home</span>Home</a>
+                </li>
+                <li>
+                    <a href="/notifications.html"><span class="material-icons">notifications</span>Notifications</a>
+                </li>
+                <li class="active">
+                    <a href="/seeker-profile.html"><span class="material-icons">person</span>Profile</a>
+                </li>
+                <li>
+                    <a href="#"><span class="material-icons">settings</span>Settings</a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="profile-card">
+                <div class="profile-header">
+                    <h1>Profile Information</h1>
+                    <button id="logoutBtn" class="logout-btn">
+                        <span class="material-icons">logout</span>
+                        Logout
+                    </button>
+                </div>
+                
+                <div class="profile-info">
+                    <form id="profileForm" class="profile-form">
+                        <div class="form-group">
+                            <label>
+                                <span class="material-icons">person</span>
+                                First Name
+                            </label>
+                            <input type="text" id="firstName" name="firstName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <span class="material-icons">person</span>
+                                Last Name
+                            </label>
+                            <input type="text" id="lastName" name="lastName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <span class="material-icons">email</span>
+                                Email
+                            </label>
+                            <input type="email" id="userEmail" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <span class="material-icons">phone</span>
+                                Phone
+                            </label>
+                            <input type="tel" id="userPhone" name="phone">
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <span class="material-icons">location_on</span>
+                                Location
+                            </label>
+                            <input type="text" id="userLocation" name="location">
+                        </div>
+                        <button type="submit" class="save-btn">
+                            <span class="material-icons">save</span>
+                            Save Changes
+                        </button>
+                    </form>
+                </div>
+
+                <div class="resume-section">
+                    <h2>Resume</h2>
+                    <div class="upload-area" id="uploadArea">
+                        <input type="file" id="resumeFile" accept=".pdf,.doc,.docx" style="display: none;">
+                        <div id="currentResume" style="display: none;" class="current-resume">
+                            <span class="material-icons">description</span>
+                            <a href="#" target="_blank" id="resumeLink">View Current Resume</a>
+                            <button class="delete-resume" id="deleteResume">
+                                <span class="material-icons">delete</span>
+                            </button>
+                        </div>
+                        <button id="uploadResumeBtn" class="upload-btn">
+                            <span class="material-icons">upload_file</span>
+                            Upload resume
+                        </button>
+                        <p class="upload-info">Supported formats: PDF, DOC, DOCX (Max 5MB)</p>
+                        <div id="uploadError" class="upload-error" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Check authentication
+        const token = localStorage.getItem('token');
+        const userType = localStorage.getItem('userType');
+
+        if (!token || userType !== 'job_seeker') {
+            window.location.replace('/login.html');
+            throw new Error('Not authenticated');
+        }
+
+        // DOM Elements
+        const profileForm = document.getElementById('profileForm');
+        const firstNameInput = document.getElementById('firstName');
+        const lastNameInput = document.getElementById('lastName');
+        const userEmailInput = document.getElementById('userEmail');
+        const userPhoneInput = document.getElementById('userPhone');
+        const userLocationInput = document.getElementById('userLocation');
+        const uploadResumeBtn = document.getElementById('uploadResumeBtn');
+        const resumeFile = document.getElementById('resumeFile');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const uploadArea = document.getElementById('uploadArea');
+        const currentResume = document.getElementById('currentResume');
+        const resumeLink = document.getElementById('resumeLink');
+        const deleteResume = document.getElementById('deleteResume');
+        const uploadError = document.getElementById('uploadError');
+
+        // Fetch user profile data
+        async function fetchUserProfile() {
+            try {
+                // First check if we have a valid token
+                if (!token) {
+                    window.location.replace('/login.html');
+                    throw new Error('Not authenticated. Please log in.');
+                }
+
+                console.log('Fetching profile with token:', token); // Debug log
+
+                const response = await fetch('/api/profile', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    },
+                    credentials: 'same-origin'
+                });
+
+                console.log('Response status:', response.status); // Debug log
+                console.log('Response headers:', Object.fromEntries(response.headers.entries())); // Debug log
+
+                // Check if we're redirected to login page
+                if (response.redirected) {
+                    console.log('Redirected to:', response.url); // Debug log
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('userType');
+                    window.location.replace('/login.html');
+                    throw new Error('Session expired. Please log in again.');
+                }
+
+                const contentType = response.headers.get('content-type');
+                console.log('Content-Type:', contentType); // Debug log
+                
+                if (!contentType || !contentType.includes('application/json')) {
+                    console.error('Invalid content type:', contentType);
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('userType');
+                    window.location.replace('/login.html');
+                    throw new Error('Invalid response from server. Please log in again.');
+                }
+
+                const text = await response.text();
+                console.log('Raw response:', text); // Debug log
+
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (parseError) {
+                    console.error('JSON Parse Error:', parseError);
+                    throw new Error('Invalid response format from server');
+                }
+
+                if (!response.ok) {
+                    if (response.status === 401 || response.status === 403) {
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('userType');
+                        window.location.replace('/login.html');
+                    }
+                    throw new Error(data.error || 'Failed to load profile data');
+                }
+
+                if (!data) {
+                    throw new Error('No profile data received');
+                }
+
+                console.log('Parsed profile data:', data); // Debug log
+                
+                // Update the form with user data
+                firstNameInput.value = data.firstName || '';
+                lastNameInput.value = data.lastName || '';
+                userEmailInput.value = data.email || '';
+                userPhoneInput.value = data.phone || '';
+                userLocationInput.value = data.location || '';
+
+                // Handle resume display
+                if (data.resumeUrl) {
+                    currentResume.style.display = 'flex';
+                    resumeLink.href = data.resumeUrl;
+                    uploadResumeBtn.textContent = 'Update Resume';
+                } else {
+                    currentResume.style.display = 'none';
+                    uploadResumeBtn.textContent = 'Upload Resume';
+                }
+            } catch (error) {
+                console.error('Profile fetch error:', error);
+                
+                // If we have a storage access error or we're not authenticated, redirect to login
+                if (error.message.includes('Access to storage is not allowed') || 
+                    error.message.includes('Not authenticated')) {
+                    return; // Don't show error message as we're redirecting
+                }
+
+                const errorMessage = document.createElement('div');
+                errorMessage.className = 'error-message';
+                errorMessage.innerHTML = 
+                    '<span class="material-icons">error_outline</span>' +
+                    '<span class="error-text">' + error.message + '</span>' +
+                    '<button onclick="retryFetchProfile()" class="retry-btn">' +
+                    '<span class="material-icons">refresh</span>' +
+                    'Retry' +
+                    '</button>';
+                
+                // Remove any existing error messages
+                const existingError = profileForm.querySelector('.error-message');
+                if (existingError) {
+                    existingError.remove();
+                }
+                
+                profileForm.insertBefore(errorMessage, profileForm.firstChild);
+            }
+        }
+
+        // Retry function for profile fetch
+        async function retryFetchProfile() {
+            const existingError = profileForm.querySelector('.error-message');
+            if (existingError) {
+                existingError.remove();
+            }
+            await fetchUserProfile();
+        }
+
+        // Add some basic styles for the error message
+        const style = document.createElement('style');
+        style.textContent = `
+            .error-message {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 12px;
+                margin-bottom: 16px;
+                background-color: #fee2e2;
+                border: 1px solid #ef4444;
+                border-radius: 4px;
+                color: #dc2626;
+            }
+            .error-message .material-icons {
+                font-size: 20px;
+            }
+            .error-message .error-text {
+                flex: 1;
+            }
+            .retry-btn {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                padding: 4px 8px;
+                background-color: #dc2626;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+            .retry-btn:hover {
+                background-color: #b91c1c;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Handle profile form submission
+        profileForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Show loading state
+            const saveBtn = e.target.querySelector('.save-btn');
+            const originalBtnText = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<span class="material-icons rotating">refresh</span> Saving...';
+            saveBtn.disabled = true;
+
+            // Remove any existing messages
+            const existingMessages = profileForm.querySelectorAll('.success-message, .error-message');
+            existingMessages.forEach(msg => msg.remove());
+
+            try {
+                const response = await fetch('/api/update-profile', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        firstName: firstNameInput.value.trim(),
+                        lastName: lastNameInput.value.trim(),
+                        phone: userPhoneInput.value.trim(),
+                        location: userLocationInput.value.trim()
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to update profile');
+                }
+
+                // Update the form with returned data
+                if (data.user) {
+                    firstNameInput.value = data.user.firstName;
+                    lastNameInput.value = data.user.lastName;
+                    userPhoneInput.value = data.user.phone || '';
+                    userLocationInput.value = data.user.location || '';
+                }
+
+                // Show success message
+                const successMessage = document.createElement('div');
+                successMessage.className = 'success-message';
+                successMessage.innerHTML = `
+                    <span class="material-icons">check_circle</span>
+                    ${data.message || 'Profile updated successfully'}
+                `;
+                profileForm.appendChild(successMessage);
+
+            } catch (error) {
+                console.error('Error:', error);
+                
+                // Show error message
+                const errorMessage = document.createElement('div');
+                errorMessage.className = 'error-message';
+                errorMessage.innerHTML = `
+                    <span class="material-icons">error_outline</span>
+                    ${error.message || 'Failed to update profile. Please try again.'}
+                `;
+                profileForm.appendChild(errorMessage);
+            } finally {
+                // Restore button state
+                saveBtn.innerHTML = originalBtnText;
+                saveBtn.disabled = false;
+
+                // Remove messages after 3 seconds
+                setTimeout(() => {
+                    const messages = profileForm.querySelectorAll('.success-message, .error-message');
+                    messages.forEach(msg => msg.remove());
+                }, 3000);
+            }
+        });
+
+        // Load user profile when page loads
+        fetchUserProfile();
+
+        // Resume upload handler
+        uploadResumeBtn.addEventListener('click', () => {
+            resumeFile.click();
+        });
+
+        resumeFile.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Check file size
+            if (file.size > 5 * 1024 * 1024) {
+                uploadError.textContent = 'File size exceeds 5MB limit';
+                uploadError.style.display = 'block';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('resume', file);
+
+            try {
+                uploadArea.classList.add('uploading');
+                uploadResumeBtn.disabled = true;
+                uploadResumeBtn.innerHTML = '<span class="material-icons">hourglass_empty</span> Uploading...';
+                uploadError.style.display = 'none';
+
+                const response = await fetch('/api/upload-resume', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Upload failed');
+                }
+
+                // Update UI to show new resume
+                currentResume.style.display = 'flex';
+                resumeLink.href = data.resumeUrl;
+                uploadResumeBtn.innerHTML = '<span class="material-icons">upload_file</span> Update Resume';
+                
+                // Show success message
+                alert('Resume uploaded successfully!');
+            } catch (error) {
+                console.error('Error:', error);
+                uploadError.textContent = error.message || 'Failed to upload resume. Please try again.';
+                uploadError.style.display = 'block';
+            } finally {
+                uploadArea.classList.remove('uploading');
+                uploadResumeBtn.disabled = false;
+                if (!uploadError.style.display === 'block') {
+                    uploadResumeBtn.innerHTML = '<span class="material-icons">upload_file</span> Upload Resume';
+                }
+            }
+        });
+
+        // Delete resume handler
+        deleteResume.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to delete your resume?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/delete-resume', {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to delete resume');
+                }
+
+                // Update UI
+                currentResume.style.display = 'none';
+                uploadResumeBtn.innerHTML = '<span class="material-icons">upload_file</span> Upload Resume';
+                alert('Resume deleted successfully');
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to delete resume. Please try again.');
+            }
+        });
+
+        // Logout handler
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userType');
+            window.location.href = '/';
+        });
+    </script>
+</body>
+</html> 

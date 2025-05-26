@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Post Job - JOB-ON</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/post-job.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body class="post-job-page">
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="logo">
+                <img src="images/logo.svg" alt="JOB-ON" class="nav-logo">
+            </div>
+            <ul class="nav-links">
+                <li>
+                    <a href="/"><span class="material-icons">home</span>Home</a>
+                </li>
+                <li>
+                    <a href="/notifications.html"><span class="material-icons">notifications</span>Notifications</a>
+                </li>
+                <li>
+                    <a href="/employer-profile.html"><span class="material-icons">business</span>Profile</a>
+                </li>
+                <li class="active">
+                    <a href="/post-job.html"><span class="material-icons">work</span>Post Job</a>
+                </li>
+                <li>
+                    <a href="#"><span class="material-icons">settings</span>Settings</a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="post-job-card">
+                <div class="post-job-header">
+                    <h1>Add job basics</h1>
+                    <img src="images/job-post-illustration.svg" alt="Post Job" class="header-illustration">
+                </div>
+
+                <form id="jobPostForm" class="job-form">
+                    <div class="form-group">
+                        <label for="companyName">Company Name:</label>
+                        <input type="text" id="companyName" name="companyName" required 
+                               placeholder="Enter your company name">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="companyDescription">Company description</label>
+                        <textarea id="companyDescription" name="companyDescription" required
+                                placeholder="Present your company by communicating your business, your market position, your company culture, etc."
+                                rows="4"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="jobTitle">Job title:</label>
+                        <input type="text" id="jobTitle" name="jobTitle" required
+                               placeholder="e.g., Frontend Developer">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="jobDescription">Job Description:</label>
+                        <textarea id="jobDescription" name="jobDescription" required
+                                placeholder="Describe the role, responsibilities, and requirements"
+                                rows="6"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="numberOfPeople">Number of people to hire:</label>
+                            <select id="numberOfPeople" name="numberOfPeople" required>
+                                <option value="">Select</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5+</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="jobLocation">Job location:</label>
+                            <select id="jobLocation" name="jobLocation" required>
+                                <option value="">Select location</option>
+                                <option value="Manila">Manila</option>
+                                <option value="Quezon City">Quezon City</option>
+                                <option value="Makati">Makati</option>
+                                <option value="Taguig">Taguig</option>
+                                <option value="Remote">Remote</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="salary">Salary Range (PHP):</label>
+                        <div class="salary-inputs">
+                            <input type="number" id="minSalary" name="minSalary" required
+                                   placeholder="Minimum" min="0">
+                            <span class="salary-separator">to</span>
+                            <input type="number" id="maxSalary" name="maxSalary" required
+                                   placeholder="Maximum" min="0">
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="submit-btn">
+                            <span class="material-icons">post_add</span>
+                            Post Job
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Check authentication
+        const token = localStorage.getItem('token');
+        const userType = localStorage.getItem('userType');
+
+        if (!token) {
+            window.location.href = '/';
+        }
+
+        // Handle form submission
+        const jobPostForm = document.getElementById('jobPostForm');
+        
+        jobPostForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = {
+                companyName: document.getElementById('companyName').value,
+                companyDescription: document.getElementById('companyDescription').value,
+                jobTitle: document.getElementById('jobTitle').value,
+                jobDescription: document.getElementById('jobDescription').value,
+                numberOfPeople: document.getElementById('numberOfPeople').value,
+                jobLocation: document.getElementById('jobLocation').value,
+                salaryRange: {
+                    min: document.getElementById('minSalary').value,
+                    max: document.getElementById('maxSalary').value
+                }
+            };
+
+            try {
+                const response = await fetch('/api/jobs', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to post job');
+                }
+
+                alert('Job posted successfully!');
+                window.location.href = '/'; // Redirect to home page
+            } catch (error) {
+                console.error('Error:', error);
+                alert(error.message || 'Failed to post job. Please try again.');
+            }
+        });
+    </script>
+</body>
+</html> 
