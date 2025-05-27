@@ -90,6 +90,40 @@ db.connect((err) => {
   }
   console.log('Connected to MySQL database');
   
+  // Add migration for comments table
+  const dropCommentsTable = `DROP TABLE IF EXISTS comments`;
+  const createCommentsTable = `
+    CREATE TABLE IF NOT EXISTS comments (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      notification_id INT,
+      user_id INT,
+      parent_id INT NULL,
+      content TEXT,
+      is_system_message BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (notification_id) REFERENCES notifications(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (parent_id) REFERENCES comments(id) ON DELETE SET NULL
+    )
+  `;
+
+  // Execute table recreation
+  db.query(dropCommentsTable, (err) => {
+    if (err) {
+      console.error('Error dropping comments table:', err);
+      return;
+    }
+    console.log('Comments table dropped successfully');
+
+    db.query(createCommentsTable, (err) => {
+      if (err) {
+        console.error('Error creating comments table:', err);
+        return;
+      }
+      console.log('Comments table created successfully');
+    });
+  });
+
   // Create tables if they don't exist
   const createUsersTable = `
     CREATE TABLE IF NOT EXISTS users (
@@ -172,17 +206,18 @@ db.connect((err) => {
     )
   `;
 
-  const createCommentsTable = `
-    CREATE TABLE IF NOT EXISTS comments (
+  const createUserNotificationsTable = `
+    CREATE TABLE IF NOT EXISTS user_notifications (
       id INT AUTO_INCREMENT PRIMARY KEY,
-      notification_id INT,
       user_id INT,
-      parent_id INT NULL,
-      content TEXT,
+      title VARCHAR(255),
+      message TEXT,
+      type ENUM('application_status', 'system', 'message') NOT NULL,
+      is_read BOOLEAN DEFAULT false,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (notification_id) REFERENCES notifications(id),
+      related_id INT,
       FOREIGN KEY (user_id) REFERENCES users(id),
-      FOREIGN KEY (parent_id) REFERENCES comments(id)
+      FOREIGN KEY (related_id) REFERENCES notifications(id)
     )
   `;
 
@@ -230,12 +265,12 @@ db.connect((err) => {
             }
             console.log('Notifications table created successfully');
 
-            db.query(createCommentsTable, (err) => {
+            db.query(createUserNotificationsTable, (err) => {
               if (err) {
-                console.error('Error creating comments table:', err);
+                console.error('Error creating user notifications table:', err);
                 return;
               }
-              console.log('Comments table created successfully');
+              console.log('User notifications table created successfully');
             });
           });
         });
@@ -743,27 +778,197 @@ apiRouter.get('/notifications', authenticateToken, (req, res) => {
     });
 });
 
-// Update notification status
-apiRouter.put('/notifications/:id/status', authenticateToken, (req, res) => {
+// Update notification status with user notification
+apiRouter.put('/notifications/:id/status', authenticateToken, async (req, res) => {
+    console.log('Updating notification status:', {
+        notificationId: req.params.id,
+        status: req.body.status,
+        userId: req.user.id
+    });
+
     const { status } = req.body;
     const notificationId = req.params.id;
 
     if (!['accepted', 'rejected'].includes(status)) {
-        return res.status(400).json({ error: 'Invalid status' });
+        console.error('Invalid status provided:', status);
+        return res.status(400).json({ error: 'Invalid status. Must be either "accepted" or "rejected".' });
     }
 
-    const query = 'UPDATE notifications SET status = ? WHERE id = ? AND employer_id = ?';
-    db.query(query, [status, notificationId, req.user.id], (err, result) => {
+    // Start a transaction
+    db.beginTransaction(async (err) => {
         if (err) {
-            console.error('Database error:', err);
-            return res.status(500).json({ error: 'Failed to update status' });
+            console.error('Transaction start error:', err);
+            return res.status(500).json({ error: 'Failed to start transaction' });
         }
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Notification not found' });
-        }
+        try {
+            // First get the notification details including applicant info
+            const getDetailsQuery = `
+                SELECT 
+                    n.*,
+                    j.job_title,
+                    u.email as applicant_email,
+                    u.first_name as applicant_first_name,
+                    u.last_name as applicant_last_name,
+                    e.first_name as employer_first_name,
+                    e.last_name as employer_last_name,
+                    c.company_name
+                FROM notifications n
+                JOIN jobs j ON n.job_id = j.id
+                JOIN users u ON n.applicant_id = u.id
+                JOIN users e ON n.employer_id = e.id
+                LEFT JOIN profiles c ON e.id = c.user_id
+                WHERE n.id = ? AND n.employer_id = ?
+            `;
 
-        res.json({ message: 'Status updated successfully' });
+            console.log('Fetching notification details...');
+            
+            db.query(getDetailsQuery, [notificationId, req.user.id], async (err, results) => {
+                if (err) {
+                    console.error('Error fetching notification details:', err);
+                    return db.rollback(() => {
+                        res.status(500).json({ error: 'Failed to fetch notification details' });
+                    });
+                }
+
+                if (results.length === 0) {
+                    console.error('Notification not found or unauthorized');
+                    return db.rollback(() => {
+                        res.status(404).json({ error: 'Notification not found or you are not authorized to update it' });
+                    });
+                }
+
+                const notificationDetails = results[0];
+                console.log('Found notification:', notificationDetails);
+
+                // Update the notification status
+                const updateQuery = 'UPDATE notifications SET status = ? WHERE id = ? AND employer_id = ?';
+                console.log('Updating notification status...');
+
+                db.query(updateQuery, [status, notificationId, req.user.id], async (err, result) => {
+                    if (err) {
+                        console.error('Error updating notification status:', err);
+                        return db.rollback(() => {
+                            res.status(500).json({ error: 'Failed to update notification status' });
+                        });
+                    }
+
+                    if (result.affectedRows === 0) {
+                        console.error('No rows affected in status update');
+                        return db.rollback(() => {
+                            res.status(404).json({ error: 'Failed to update notification status - no matching record found' });
+                        });
+                    }
+
+                    // Create a system message in comments
+                    const systemMessage = status === 'rejected' 
+                        ? 'Your application has been rejected.'
+                        : 'Congratulations! Your application has been accepted.';
+
+                    // Update the comment query to match the table structure
+                    const commentQuery = `
+                        INSERT INTO comments (
+                            notification_id, 
+                            user_id, 
+                            content, 
+                            is_system_message
+                        ) VALUES (?, ?, ?, ?)
+                    `;
+
+                    console.log('Creating system message with params:', {
+                        notificationId,
+                        userId: req.user.id,
+                        systemMessage,
+                        isSystemMessage: true
+                    });
+
+                    db.query(commentQuery, [
+                        notificationId, 
+                        req.user.id, 
+                        systemMessage, 
+                        true
+                    ], (err) => {
+                        if (err) {
+                            console.error('Error creating system message:', err);
+                            console.error('Error details:', err.message);
+                            return db.rollback(() => {
+                                res.status(500).json({ error: `Failed to create system message: ${err.message}` });
+                            });
+                        }
+
+                        // Create user notification for the applicant
+                        const notificationTitle = status === 'rejected' 
+                            ? 'Application Rejected'
+                            : 'Application Accepted';
+                        
+                        const notificationMessage = status === 'rejected'
+                            ? `Your application for ${notificationDetails.job_title} at ${notificationDetails.company_name} has been rejected.`
+                            : `Congratulations! Your application for ${notificationDetails.job_title} at ${notificationDetails.company_name} has been accepted.`;
+
+                        const createUserNotification = `
+                            INSERT INTO user_notifications (
+                                user_id,
+                                title,
+                                message,
+                                type,
+                                related_id
+                            ) VALUES (?, ?, ?, 'application_status', ?)
+                        `;
+
+                        console.log('Creating user notification...');
+
+                        db.query(createUserNotification, [
+                            notificationDetails.applicant_id,
+                            notificationTitle,
+                            notificationMessage,
+                            notificationId
+                        ], (err) => {
+                            if (err) {
+                                console.error('Error creating user notification:', err);
+                                return db.rollback(() => {
+                                    res.status(500).json({ error: 'Failed to create user notification' });
+                                });
+                            }
+
+                            // Commit the transaction
+                            console.log('Committing transaction...');
+                            db.commit((err) => {
+                                if (err) {
+                                    console.error('Error committing transaction:', err);
+                                    return db.rollback(() => {
+                                        res.status(500).json({ error: 'Failed to commit transaction' });
+                                    });
+                                }
+
+                                console.log('Successfully updated notification status');
+                                // Send response
+                                res.json({ 
+                                    message: 'Status updated successfully',
+                                    notification: {
+                                        id: notificationId,
+                                        status,
+                                        jobTitle: notificationDetails.job_title,
+                                        applicant: {
+                                            name: `${notificationDetails.applicant_first_name} ${notificationDetails.applicant_last_name}`,
+                                            email: notificationDetails.applicant_email
+                                        },
+                                        employer: {
+                                            name: `${notificationDetails.employer_first_name} ${notificationDetails.employer_last_name}`,
+                                            company: notificationDetails.company_name
+                                        }
+                                    }
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        } catch (error) {
+            console.error('Unexpected error:', error);
+            db.rollback(() => {
+                res.status(500).json({ error: 'An unexpected error occurred' });
+            });
+        }
     });
 });
 
@@ -1165,6 +1370,38 @@ apiRouter.get('/notifications/:notificationId/comments', authenticateToken, (req
 
             res.json(formattedComments);
         });
+    });
+});
+
+// Get user notifications
+apiRouter.get('/user-notifications', authenticateToken, (req, res) => {
+    const query = `
+        SELECT * FROM user_notifications
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+    `;
+
+    db.query(query, [req.user.id], (err, results) => {
+        if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'Failed to fetch notifications' });
+        }
+
+        res.json(results);
+    });
+});
+
+// Mark user notification as read
+apiRouter.put('/user-notifications/:id/read', authenticateToken, (req, res) => {
+    const query = 'UPDATE user_notifications SET is_read = true WHERE id = ? AND user_id = ?';
+    
+    db.query(query, [req.params.id, req.user.id], (err, result) => {
+        if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'Failed to update notification' });
+        }
+
+        res.json({ message: 'Notification marked as read' });
     });
 });
 

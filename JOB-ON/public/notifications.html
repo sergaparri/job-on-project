@@ -21,7 +21,11 @@
                     <a href="/"><span class="material-icons">home</span>Home</a>
                 </li>
                 <li class="active">
-                    <a href="/notifications.html"><span class="material-icons">notifications</span>Notifications</a>
+                    <a href="/notifications.html">
+                        <span class="material-icons">notifications</span>
+                        Notifications
+                        <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+                    </a>
                 </li>
                 <li>
                     <a href="/employer-profile.html"><span class="material-icons">business</span>Profile</a>
@@ -48,8 +52,13 @@
                     </div>
                 </div>
 
+                <!-- Add user notifications section -->
+                <div id="userNotifications" class="user-notifications">
+                    <!-- User notifications will be added here -->
+                </div>
+
                 <div id="notificationsList" class="notifications-list">
-                    <!-- Notifications will be dynamically added here -->
+                    <!-- Job application notifications will be added here -->
                 </div>
             </div>
         </main>
@@ -274,26 +283,23 @@
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify({ status })
                 });
 
-                if (response.status === 401 || response.status === 403) {
-                    safeStorageAccess(localStorage.removeItem.bind(localStorage), 'token');
-                    safeStorageAccess(localStorage.removeItem.bind(localStorage), 'userType');
-                    window.location.href = '/login.html?error=auth_expired';
-                    return;
-                }
-
                 if (!response.ok) {
-                    throw new Error('Failed to update status');
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to update status');
                 }
 
+                // Refresh the notifications list
                 await loadNotifications();
+                await loadUserNotifications();
             } catch (error) {
-                console.error('Error:', error);
-                alert('Failed to update application status. Please try again.');
+                console.error('Error updating status:', error);
+                alert(error.message || 'Failed to update application status. Please try again.');
             }
         }
 
@@ -407,6 +413,9 @@
 
         // Create HTML for a comment and its replies
         function createCommentHTML(comment) {
+            const isSystemMessage = comment.is_system_message;
+            const commentClass = isSystemMessage ? 'comment system-message' : 'comment';
+            
             const repliesHTML = comment.replies
                 ? comment.replies.map(reply => `
                     <div class="comment reply" data-comment-id="${reply.id}">
@@ -422,25 +431,33 @@
                 : '';
 
             return `
-                <div class="comment" data-comment-id="${comment.id}">
+                <div class="${commentClass}" data-comment-id="${comment.id}">
                     <div class="comment-content">
                         <div class="comment-header">
-                            <span class="comment-author">${comment.user.name}</span>
+                            ${isSystemMessage ? `
+                                <span class="comment-author system">System</span>
+                            ` : `
+                                <span class="comment-author">${comment.user.name}</span>
+                            `}
                             <span class="comment-time">${timeAgo(new Date(comment.createdAt))}</span>
                         </div>
                         <p class="comment-text">${comment.content}</p>
-                        <button class="reply-btn">
-                            <span class="material-icons">reply</span> Reply
-                        </button>
+                        ${!isSystemMessage ? `
+                            <button class="reply-btn">
+                                <span class="material-icons">reply</span> Reply
+                            </button>
+                        ` : ''}
                     </div>
                     <div class="replies">
                         ${repliesHTML}
-                        <div class="reply-form" style="display: none;">
-                            <textarea placeholder="Write a reply..." class="reply-input"></textarea>
-                            <button class="reply-submit">
-                                <span class="material-icons">send</span>
-                            </button>
-                        </div>
+                        ${!isSystemMessage ? `
+                            <div class="reply-form" style="display: none;">
+                                <textarea placeholder="Write a reply..." class="reply-input"></textarea>
+                                <button class="reply-submit">
+                                    <span class="material-icons">send</span>
+                                </button>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
             `;
@@ -523,10 +540,97 @@
             });
         }
 
-        // Initialize the page
+        // Function to load user notifications
+        async function loadUserNotifications() {
+            try {
+                const response = await fetch('/api/user-notifications', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load user notifications');
+                }
+
+                const notifications = await response.json();
+                const unreadCount = notifications.filter(n => !n.is_read).length;
+                
+                // Update badge
+                const badge = document.getElementById('notificationBadge');
+                if (unreadCount > 0) {
+                    badge.textContent = unreadCount;
+                    badge.style.display = 'block';
+                } else {
+                    badge.style.display = 'none';
+                }
+
+                // Display user notifications
+                const userNotificationsContainer = document.getElementById('userNotifications');
+                userNotificationsContainer.innerHTML = notifications.map(notification => `
+                    <div class="user-notification ${notification.is_read ? 'read' : 'unread'}" data-id="${notification.id}">
+                        <div class="notification-icon">
+                            <span class="material-icons">${getNotificationIcon(notification.type)}</span>
+                        </div>
+                        <div class="notification-content">
+                            <h4>${notification.title}</h4>
+                            <p>${notification.message}</p>
+                            <span class="notification-time">${timeAgo(new Date(notification.created_at))}</span>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Add click handler to mark notifications as read
+                userNotificationsContainer.querySelectorAll('.user-notification.unread').forEach(notif => {
+                    notif.addEventListener('click', async () => {
+                        const notifId = notif.dataset.id;
+                        try {
+                            const response = await fetch(`/api/user-notifications/${notifId}/read`, {
+                                method: 'PUT',
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Accept': 'application/json'
+                                }
+                            });
+
+                            if (response.ok) {
+                                notif.classList.remove('unread');
+                                notif.classList.add('read');
+                                loadUserNotifications(); // Refresh badge count
+                            }
+                        } catch (error) {
+                            console.error('Error marking notification as read:', error);
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error('Error loading user notifications:', error);
+            }
+        }
+
+        // Helper function to get notification icon
+        function getNotificationIcon(type) {
+            switch (type) {
+                case 'application_status':
+                    return 'work';
+                case 'message':
+                    return 'message';
+                case 'system':
+                    return 'info';
+                default:
+                    return 'notifications';
+            }
+        }
+
+        // Load notifications periodically
+        setInterval(loadUserNotifications, 30000); // Check every 30 seconds
+
+        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             if (userType) {
                 loadNotifications();
+                loadUserNotifications();
             }
         });
     </script>
