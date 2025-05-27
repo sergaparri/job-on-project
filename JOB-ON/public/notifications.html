@@ -56,21 +56,60 @@
     </div>
 
     <script>
-        // Check authentication
-        const token = localStorage.getItem('token');
-        const userType = localStorage.getItem('userType');
+        // Global variables
+        let token = null;
+        let userType = null;
 
-        if (!token || userType !== 'employer') {
-            window.location.href = '/';
+        try {
+            token = localStorage.getItem('token');
+            userType = localStorage.getItem('userType');
+        } catch (error) {
+            console.error('Error accessing localStorage:', error);
+            // Redirect to login if storage access fails
+            window.location.href = '/login.html?error=storage_access';
+        }
+
+        // Function to safely access localStorage
+        function safeStorageAccess(operation, ...args) {
+            try {
+                return operation(...args);
+            } catch (error) {
+                console.error('Storage access error:', error);
+                return null;
+            }
+        }
+
+        // Function to handle authentication state
+        function checkAuth() {
+            if (!token) {
+                window.location.href = '/login.html?error=no_token';
+                return false;
+            }
+            return true;
+        }
+
+        // Check authentication before proceeding
+        if (!checkAuth()) {
+            throw new Error('Authentication check failed');
         }
 
         // DOM Elements
         const notificationsList = document.getElementById('notificationsList');
         const filterButtons = document.querySelectorAll('.filter-btn');
 
-        // Load notifications
+        // Update page title based on user type
+        const pageTitle = document.querySelector('.notifications-header h1');
+        if (userType === 'employer') {
+            pageTitle.textContent = 'Job Applications';
+        } else {
+            pageTitle.textContent = 'My Applications';
+        }
+
+        // Load notifications with error handling
         async function loadNotifications() {
             try {
+                if (!userType) return;
+
                 console.log('Loading notifications...');
                 const response = await fetch('/api/notifications', {
                     headers: {
@@ -80,40 +119,40 @@
                 });
 
                 console.log('Response status:', response.status);
-                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+                if (response.status === 401 || response.status === 403) {
+                    // Handle authentication/authorization errors
+                    safeStorageAccess(localStorage.removeItem.bind(localStorage), 'token');
+                    safeStorageAccess(localStorage.removeItem.bind(localStorage), 'userType');
+                    window.location.href = '/login.html?error=auth_expired';
+                    return;
+                }
 
                 if (!response.ok) {
                     throw new Error('Failed to load notifications');
                 }
 
-                const contentType = response.headers.get('content-type');
-                console.log('Content-Type:', contentType);
-
-                let notifications;
-                try {
-                    const textResponse = await response.text();
-                    console.log('Raw response:', textResponse);
-                    notifications = JSON.parse(textResponse);
-                } catch (parseError) {
-                    console.error('JSON Parse Error:', parseError);
-                    throw new Error('Failed to parse notifications');
-                }
-
+                const notifications = await response.json();
                 console.log('Notifications loaded:', notifications);
                 displayNotifications(notifications);
             } catch (error) {
                 console.error('Error loading notifications:', error);
-                notificationsList.innerHTML = `
-                    <div class="error-message">
-                        <span class="material-icons">error_outline</span>
-                        <p>Failed to load notifications. Please try again later.</p>
-                        <button onclick="loadNotifications()" class="retry-btn">
-                            <span class="material-icons">refresh</span>
-                            Retry
-                        </button>
-                    </div>
-                `;
+                handleLoadError(error);
             }
+        }
+
+        // Handle load errors
+        function handleLoadError(error) {
+            notificationsList.innerHTML = `
+                <div class="error-message">
+                    <span class="material-icons">error_outline</span>
+                    <p>${error.message || 'Failed to load notifications. Please try again later.'}</p>
+                    <button onclick="loadNotifications()" class="retry-btn">
+                        <span class="material-icons">refresh</span>
+                        Retry
+                    </button>
+                </div>
+            `;
         }
 
         // Display notifications
@@ -124,44 +163,113 @@
                 ? notifications 
                 : notifications.filter(n => n.status === currentFilter);
 
-            notificationsList.innerHTML = filteredNotifications.map(notification => `
-                <div class="notification-card ${notification.isRead ? 'read' : 'unread'}" data-id="${notification.id}">
-                    <div class="notification-header">
-                        <h3>${notification.jobTitle}</h3>
-                        <span class="status-badge ${notification.status}">${notification.status}</span>
-                    </div>
-                    <div class="notification-content">
-                        <div class="applicant-info">
-                            <p><span class="material-icons">person</span> ${notification.applicant.name}</p>
-                            <p><span class="material-icons">email</span> ${notification.applicant.email}</p>
-                            ${notification.applicant.resumeUrl ? 
-                                `<a href="${notification.applicant.resumeUrl}" target="_blank" class="resume-link">
-                                    <span class="material-icons">description</span> View Resume
-                                </a>` : 
-                                '<p class="no-resume">No resume uploaded</p>'
-                            }
+            notificationsList.innerHTML = filteredNotifications.map(notification => {
+                if (userType === 'employer') {
+                    return `
+                        <div class="notification-card ${notification.isRead ? 'read' : 'unread'}" data-id="${notification.id}">
+                            <div class="notification-header">
+                                <h3>${notification.jobTitle}</h3>
+                                <span class="status-badge ${notification.status}">${notification.status}</span>
+                            </div>
+                            <div class="notification-content">
+                                <div class="applicant-info">
+                                    <p><span class="material-icons">person</span> ${notification.applicant.name}</p>
+                                    <p><span class="material-icons">email</span> ${notification.applicant.email}</p>
+                                    ${notification.applicant.resumeUrl ? 
+                                        `<a href="${notification.applicant.resumeUrl}" target="_blank" class="resume-link">
+                                            <span class="material-icons">description</span> View Resume
+                                        </a>` : 
+                                        '<p class="no-resume">No resume uploaded</p>'
+                                    }
+                                </div>
+                                <div class="notification-actions">
+                                    ${notification.status === 'pending' ? `
+                                        <button onclick="updateStatus(${notification.id}, 'accepted')" class="action-btn accept">
+                                            <span class="material-icons">check_circle</span> Accept
+                                        </button>
+                                        <button onclick="updateStatus(${notification.id}, 'rejected')" class="action-btn reject">
+                                            <span class="material-icons">cancel</span> Reject
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            <div class="notification-footer">
+                                <span class="timestamp">Applied ${timeAgo(new Date(notification.createdAt))}</span>
+                            </div>
+                            <div class="comments-section" data-notification-id="${notification.id}">
+                                <div class="comments-list"></div>
+                                <div class="comment-form">
+                                    <textarea placeholder="Write a comment..." class="comment-input"></textarea>
+                                    <button class="comment-submit">
+                                        <span class="material-icons">send</span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                        <div class="notification-actions">
-                            ${notification.status === 'pending' ? `
-                                <button onclick="updateStatus(${notification.id}, 'accepted')" class="action-btn accept">
-                                    <span class="material-icons">check_circle</span> Accept
-                                </button>
-                                <button onclick="updateStatus(${notification.id}, 'rejected')" class="action-btn reject">
-                                    <span class="material-icons">cancel</span> Reject
-                                </button>
-                            ` : ''}
+                    `;
+                } else {
+                    return `
+                        <div class="notification-card ${notification.isRead ? 'read' : 'unread'}" data-id="${notification.id}">
+                            <div class="notification-header">
+                                <h3>${notification.jobTitle}</h3>
+                                <span class="status-badge ${notification.status}">${notification.status}</span>
+                            </div>
+                            <div class="notification-content">
+                                <div class="job-info">
+                                    <p class="job-description">${notification.jobDescription}</p>
+                                    <div class="job-meta">
+                                        <p><span class="material-icons">location_on</span> ${notification.jobLocation}</p>
+                                        <p><span class="material-icons">payments</span> ${formatSalary(notification.salaryRange.min)} - ${formatSalary(notification.salaryRange.max)}</p>
+                                    </div>
+                                </div>
+                                <div class="employer-info">
+                                    <h4>${notification.employer.company.name}</h4>
+                                    <p>${notification.employer.company.description}</p>
+                                    <p><span class="material-icons">person</span> ${notification.employer.name}</p>
+                                    <p><span class="material-icons">email</span> ${notification.employer.email}</p>
+                                </div>
+                            </div>
+                            <div class="notification-footer">
+                                <span class="timestamp">Applied ${timeAgo(new Date(notification.createdAt))}</span>
+                                <span class="status-text">
+                                    ${notification.status === 'pending' ? 'Application under review' :
+                                      notification.status === 'accepted' ? 'Application accepted! The employer will contact you soon.' :
+                                      'Application rejected'}
+                                </span>
+                            </div>
+                            <div class="comments-section" data-notification-id="${notification.id}">
+                                <div class="comments-list"></div>
+                                <div class="comment-form">
+                                    <textarea placeholder="Write a comment..." class="comment-input"></textarea>
+                                    <button class="comment-submit">
+                                        <span class="material-icons">send</span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="notification-footer">
-                        <span class="timestamp">Applied ${timeAgo(new Date(notification.createdAt))}</span>
-                    </div>
-                </div>
-            `).join('') || '<p class="no-notifications">No notifications found</p>';
+                    `;
+                }
+            }).join('') || '<p class="no-notifications">No notifications found</p>';
+
+            // Load comments for each notification
+            document.querySelectorAll('.comments-section').forEach(section => {
+                loadComments(section.dataset.notificationId);
+            });
         }
 
-        // Update application status
+        // Add salary formatting function
+        function formatSalary(amount) {
+            return new Intl.NumberFormat('en-PH', {
+                style: 'currency',
+                currency: 'PHP'
+            }).format(amount);
+        }
+
+        // Update application status with error handling
         async function updateStatus(notificationId, status) {
             try {
+                if (!userType) return;
+
                 const response = await fetch(`/api/notifications/${notificationId}/status`, {
                     method: 'PUT',
                     headers: {
@@ -171,27 +279,39 @@
                     body: JSON.stringify({ status })
                 });
 
+                if (response.status === 401 || response.status === 403) {
+                    safeStorageAccess(localStorage.removeItem.bind(localStorage), 'token');
+                    safeStorageAccess(localStorage.removeItem.bind(localStorage), 'userType');
+                    window.location.href = '/login.html?error=auth_expired';
+                    return;
+                }
+
                 if (!response.ok) {
                     throw new Error('Failed to update status');
                 }
 
-                // Reload notifications
-                loadNotifications();
+                await loadNotifications();
             } catch (error) {
                 console.error('Error:', error);
                 alert('Failed to update application status. Please try again.');
             }
         }
 
-        // Mark notification as read
+        // Mark notification as read with error handling
         async function markAsRead(notificationId) {
             try {
-                await fetch(`/api/notifications/${notificationId}/read`, {
+                if (!userType) return;
+
+                const response = await fetch(`/api/notifications/${notificationId}/read`, {
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
                 });
+
+                if (!response.ok && response.status !== 401 && response.status !== 403) {
+                    console.error('Error marking notification as read');
+                }
             } catch (error) {
                 console.error('Error:', error);
             }
@@ -214,9 +334,11 @@
             return Math.floor(seconds) + ' seconds ago';
         }
 
-        // Filter handlers
+        // Filter handlers with error checking
         filterButtons.forEach(button => {
             button.addEventListener('click', () => {
+                if (!userType) return;
+                
                 filterButtons.forEach(btn => btn.classList.remove('active'));
                 button.classList.add('active');
                 loadNotifications();
@@ -225,6 +347,8 @@
 
         // Mark notification as read when clicked
         notificationsList.addEventListener('click', event => {
+            if (!userType) return;
+
             const card = event.target.closest('.notification-card');
             if (card && !card.classList.contains('read')) {
                 markAsRead(card.dataset.id);
@@ -232,8 +356,179 @@
             }
         });
 
-        // Load notifications when page loads
-        loadNotifications();
+        // Load comments for a notification
+        async function loadComments(notificationId) {
+            try {
+                const response = await fetch(`/api/notifications/${notificationId}/comments`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load comments');
+                }
+
+                const comments = await response.json();
+                const commentsSection = document.querySelector(`.comments-section[data-notification-id="${notificationId}"]`);
+                const commentsList = commentsSection.querySelector('.comments-list');
+
+                // Group comments by parent ID
+                const commentsByParent = {};
+                comments.forEach(comment => {
+                    if (!comment.parentId) {
+                        if (!commentsByParent[comment.id]) {
+                            commentsByParent[comment.id] = {
+                                ...comment,
+                                replies: []
+                            };
+                        }
+                    }
+                });
+
+                // Add replies to their parent comments
+                comments.forEach(comment => {
+                    if (comment.parentId && commentsByParent[comment.parentId]) {
+                        commentsByParent[comment.parentId].replies.push(comment);
+                    }
+                });
+
+                // Render comments
+                commentsList.innerHTML = Object.values(commentsByParent)
+                    .map(comment => createCommentHTML(comment))
+                    .join('');
+
+                // Add event listeners for reply buttons and forms
+                setupCommentEventListeners(commentsSection);
+            } catch (error) {
+                console.error('Error loading comments:', error);
+            }
+        }
+
+        // Create HTML for a comment and its replies
+        function createCommentHTML(comment) {
+            const repliesHTML = comment.replies
+                ? comment.replies.map(reply => `
+                    <div class="comment reply" data-comment-id="${reply.id}">
+                        <div class="comment-content">
+                            <div class="comment-header">
+                                <span class="comment-author">${reply.user.name}</span>
+                                <span class="comment-time">${timeAgo(new Date(reply.createdAt))}</span>
+                            </div>
+                            <p class="comment-text">${reply.content}</p>
+                        </div>
+                    </div>
+                `).join('')
+                : '';
+
+            return `
+                <div class="comment" data-comment-id="${comment.id}">
+                    <div class="comment-content">
+                        <div class="comment-header">
+                            <span class="comment-author">${comment.user.name}</span>
+                            <span class="comment-time">${timeAgo(new Date(comment.createdAt))}</span>
+                        </div>
+                        <p class="comment-text">${comment.content}</p>
+                        <button class="reply-btn">
+                            <span class="material-icons">reply</span> Reply
+                        </button>
+                    </div>
+                    <div class="replies">
+                        ${repliesHTML}
+                        <div class="reply-form" style="display: none;">
+                            <textarea placeholder="Write a reply..." class="reply-input"></textarea>
+                            <button class="reply-submit">
+                                <span class="material-icons">send</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Setup event listeners for comments and replies
+        function setupCommentEventListeners(section) {
+            const notificationId = section.dataset.notificationId;
+            const commentForm = section.querySelector('.comment-form');
+            const commentInput = commentForm.querySelector('.comment-input');
+            const commentSubmit = commentForm.querySelector('.comment-submit');
+
+            // Comment submit handler
+            commentSubmit.addEventListener('click', async () => {
+                const content = commentInput.value.trim();
+                if (!content) return;
+
+                try {
+                    const response = await fetch(`/api/notifications/${notificationId}/comments`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ content })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Failed to post comment');
+                    }
+
+                    commentInput.value = '';
+                    await loadComments(notificationId);
+                } catch (error) {
+                    console.error('Error posting comment:', error);
+                }
+            });
+
+            // Reply button handlers
+            section.querySelectorAll('.reply-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    const comment = button.closest('.comment');
+                    const replyForm = comment.querySelector('.reply-form');
+                    replyForm.style.display = replyForm.style.display === 'none' ? 'flex' : 'none';
+                });
+            });
+
+            // Reply submit handlers
+            section.querySelectorAll('.reply-submit').forEach(button => {
+                button.addEventListener('click', async () => {
+                    const replyForm = button.closest('.reply-form');
+                    const replyInput = replyForm.querySelector('.reply-input');
+                    const content = replyInput.value.trim();
+                    if (!content) return;
+
+                    const parentComment = button.closest('.comment');
+                    const parentId = parentComment.dataset.commentId;
+
+                    try {
+                        const response = await fetch(`/api/notifications/${notificationId}/comments`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ content, parentId })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to post reply');
+                        }
+
+                        replyInput.value = '';
+                        replyForm.style.display = 'none';
+                        await loadComments(notificationId);
+                    } catch (error) {
+                        console.error('Error posting reply:', error);
+                    }
+                });
+            });
+        }
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', () => {
+            if (userType) {
+                loadNotifications();
+            }
+        });
     </script>
 </body>
 </html> 

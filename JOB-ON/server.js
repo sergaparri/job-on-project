@@ -172,6 +172,20 @@ db.connect((err) => {
     )
   `;
 
+  const createCommentsTable = `
+    CREATE TABLE IF NOT EXISTS comments (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      notification_id INT,
+      user_id INT,
+      parent_id INT NULL,
+      content TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (notification_id) REFERENCES notifications(id),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (parent_id) REFERENCES comments(id)
+    )
+  `;
+
   // Execute table creation queries in sequence
   db.query(createUsersTable, (err) => {
     if (err) {
@@ -215,6 +229,14 @@ db.connect((err) => {
               return;
             }
             console.log('Notifications table created successfully');
+
+            db.query(createCommentsTable, (err) => {
+              if (err) {
+                console.error('Error creating comments table:', err);
+                return;
+              }
+              console.log('Comments table created successfully');
+            });
           });
         });
       });
@@ -621,45 +643,101 @@ apiRouter.post('/jobs/:jobId/apply', authenticateToken, (req, res) => {
     });
 });
 
-// Get notifications for employer
+// Get notifications for employer and job seeker
 apiRouter.get('/notifications', authenticateToken, (req, res) => {
-    const query = `
-        SELECT 
-            n.id,
-            n.status,
-            n.is_read,
-            n.created_at as createdAt,
-            j.job_title as jobTitle,
-            u.first_name,
-            u.last_name,
-            u.email,
-            p.resume_url
-        FROM notifications n
-        JOIN jobs j ON n.job_id = j.id
-        JOIN users u ON n.applicant_id = u.id
-        LEFT JOIN profiles p ON u.id = p.user_id
-        WHERE n.employer_id = ?
-        ORDER BY n.created_at DESC
-    `;
+    const userId = req.user.id;
+    const userType = req.user.user_type;
 
-    db.query(query, [req.user.id], (err, results) => {
+    let query;
+    if (userType === 'employer') {
+        query = `
+            SELECT 
+                n.id,
+                n.status,
+                n.is_read,
+                n.created_at as createdAt,
+                j.job_title as jobTitle,
+                u.first_name,
+                u.last_name,
+                u.email,
+                p.resume_url
+            FROM notifications n
+            JOIN jobs j ON n.job_id = j.id
+            JOIN users u ON n.applicant_id = u.id
+            LEFT JOIN profiles p ON u.id = p.user_id
+            WHERE n.employer_id = ?
+            ORDER BY n.created_at DESC
+        `;
+    } else {
+        query = `
+            SELECT 
+                n.id,
+                n.status,
+                n.is_read,
+                n.created_at as createdAt,
+                j.job_title as jobTitle,
+                j.job_description,
+                j.job_location,
+                j.min_salary,
+                j.max_salary,
+                u.first_name as employer_first_name,
+                u.last_name as employer_last_name,
+                u.email as employer_email,
+                p.company_name,
+                p.company_description
+            FROM notifications n
+            JOIN jobs j ON n.job_id = j.id
+            JOIN users u ON n.employer_id = u.id
+            LEFT JOIN profiles p ON u.id = p.user_id
+            WHERE n.applicant_id = ?
+            ORDER BY n.created_at DESC
+        `;
+    }
+
+    db.query(query, [userId], (err, results) => {
         if (err) {
             console.error('Database error:', err);
             return res.status(500).json({ error: 'Failed to fetch notifications' });
         }
 
-        const notifications = results.map(notification => ({
-            id: notification.id,
-            jobTitle: notification.jobTitle,
-            status: notification.status,
-            isRead: notification.is_read === 1,
-            createdAt: notification.createdAt,
-            applicant: {
-                name: `${notification.first_name} ${notification.last_name}`,
-                email: notification.email,
-                resumeUrl: notification.resume_url
+        const notifications = results.map(notification => {
+            if (userType === 'employer') {
+                return {
+                    id: notification.id,
+                    jobTitle: notification.jobTitle,
+                    status: notification.status,
+                    isRead: notification.is_read === 1,
+                    createdAt: notification.createdAt,
+                    applicant: {
+                        name: `${notification.first_name} ${notification.last_name}`,
+                        email: notification.email,
+                        resumeUrl: notification.resume_url
+                    }
+                };
+            } else {
+                return {
+                    id: notification.id,
+                    jobTitle: notification.jobTitle,
+                    jobDescription: notification.job_description,
+                    jobLocation: notification.job_location,
+                    salaryRange: {
+                        min: notification.min_salary,
+                        max: notification.max_salary
+                    },
+                    status: notification.status,
+                    isRead: notification.is_read === 1,
+                    createdAt: notification.createdAt,
+                    employer: {
+                        name: `${notification.employer_first_name} ${notification.employer_last_name}`,
+                        email: notification.employer_email,
+                        company: {
+                            name: notification.company_name,
+                            description: notification.company_description
+                        }
+                    }
+                };
             }
-        }));
+        });
 
         res.json(notifications);
     });
@@ -963,6 +1041,131 @@ apiRouter.get('/my-jobs', authenticateToken, async (req, res) => {
         console.error('Error:', error);
         res.status(500).json({ error: 'Failed to fetch jobs' });
     }
+});
+
+// Add new API endpoints for comments
+apiRouter.post('/notifications/:notificationId/comments', authenticateToken, (req, res) => {
+    const { content, parentId } = req.body;
+    const notificationId = req.params.notificationId;
+    const userId = req.user.id;
+
+    // Verify user has access to this notification
+    const accessQuery = `
+        SELECT * FROM notifications 
+        WHERE id = ? AND (employer_id = ? OR applicant_id = ?)
+    `;
+
+    db.query(accessQuery, [notificationId, userId, userId], (err, results) => {
+        if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'Failed to verify access' });
+        }
+
+        if (results.length === 0) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        // Insert the comment
+        const insertQuery = `
+            INSERT INTO comments (notification_id, user_id, parent_id, content)
+            VALUES (?, ?, ?, ?)
+        `;
+
+        db.query(insertQuery, [notificationId, userId, parentId || null, content], (err, result) => {
+            if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: 'Failed to create comment' });
+            }
+
+            // Fetch the created comment with user info
+            const getCommentQuery = `
+                SELECT 
+                    c.*,
+                    u.first_name,
+                    u.last_name,
+                    u.user_type
+                FROM comments c
+                JOIN users u ON c.user_id = u.id
+                WHERE c.id = ?
+            `;
+
+            db.query(getCommentQuery, [result.insertId], (err, comments) => {
+                if (err) {
+                    console.error('Database error:', err);
+                    return res.status(500).json({ error: 'Failed to fetch comment' });
+                }
+
+                const comment = comments[0];
+                res.status(201).json({
+                    id: comment.id,
+                    content: comment.content,
+                    createdAt: comment.created_at,
+                    user: {
+                        id: comment.user_id,
+                        name: `${comment.first_name} ${comment.last_name}`,
+                        userType: comment.user_type
+                    },
+                    parentId: comment.parent_id
+                });
+            });
+        });
+    });
+});
+
+apiRouter.get('/notifications/:notificationId/comments', authenticateToken, (req, res) => {
+    const notificationId = req.params.notificationId;
+    const userId = req.user.id;
+
+    // Verify user has access to this notification
+    const accessQuery = `
+        SELECT * FROM notifications 
+        WHERE id = ? AND (employer_id = ? OR applicant_id = ?)
+    `;
+
+    db.query(accessQuery, [notificationId, userId, userId], (err, results) => {
+        if (err) {
+            console.error('Database error:', err);
+            return res.status(500).json({ error: 'Failed to verify access' });
+        }
+
+        if (results.length === 0) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        // Fetch all comments for this notification
+        const getCommentsQuery = `
+            SELECT 
+                c.*,
+                u.first_name,
+                u.last_name,
+                u.user_type
+            FROM comments c
+            JOIN users u ON c.user_id = u.id
+            WHERE c.notification_id = ?
+            ORDER BY c.created_at ASC
+        `;
+
+        db.query(getCommentsQuery, [notificationId], (err, comments) => {
+            if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ error: 'Failed to fetch comments' });
+            }
+
+            const formattedComments = comments.map(comment => ({
+                id: comment.id,
+                content: comment.content,
+                createdAt: comment.created_at,
+                user: {
+                    id: comment.user_id,
+                    name: `${comment.first_name} ${comment.last_name}`,
+                    userType: comment.user_type
+                },
+                parentId: comment.parent_id
+            }));
+
+            res.json(formattedComments);
+        });
+    });
 });
 
 // Global error handling middleware
