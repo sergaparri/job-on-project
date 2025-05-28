@@ -72,13 +72,6 @@
                             </label>
                             <input type="tel" id="userPhone" name="phone">
                         </div>
-                        <div class="form-group">
-                            <label>
-                                <span class="material-icons">location_on</span>
-                                Location
-                            </label>
-                            <input type="text" id="userLocation" name="location">
-                        </div>
                         <button type="submit" class="save-btn">
                             <span class="material-icons">save</span>
                             Save Changes
@@ -125,7 +118,6 @@
         const lastNameInput = document.getElementById('lastName');
         const userEmailInput = document.getElementById('userEmail');
         const userPhoneInput = document.getElementById('userPhone');
-        const userLocationInput = document.getElementById('userLocation');
         const uploadResumeBtn = document.getElementById('uploadResumeBtn');
         const resumeFile = document.getElementById('resumeFile');
         const logoutBtn = document.getElementById('logoutBtn');
@@ -210,7 +202,6 @@
                 lastNameInput.value = data.lastName || '';
                 userEmailInput.value = data.email || '';
                 userPhoneInput.value = data.phone || '';
-                userLocationInput.value = data.location || '';
 
                 // Handle resume display
                 if (data.resumeUrl) {
@@ -320,8 +311,7 @@
                     body: JSON.stringify({
                         firstName: firstNameInput.value.trim(),
                         lastName: lastNameInput.value.trim(),
-                        phone: userPhoneInput.value.trim(),
-                        location: userLocationInput.value.trim()
+                        phone: userPhoneInput.value.trim()
                     })
                 });
 
@@ -336,7 +326,6 @@
                     firstNameInput.value = data.user.firstName;
                     lastNameInput.value = data.user.lastName;
                     userPhoneInput.value = data.user.phone || '';
-                    userLocationInput.value = data.user.location || '';
                 }
 
                 // Show success message
@@ -470,4 +459,4 @@
         });
     </script>
 </body>
-</html> 
+</html>

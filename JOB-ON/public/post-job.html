@@ -72,26 +72,12 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label for="numberOfPeople">Number of people to hire:</label>
-                            <select id="numberOfPeople" name="numberOfPeople" required>
-                                <option value="">Select</option>
-                                <option value="1">1</option>
-                                <option value="2">2</option>
-                                <option value="3">3</option>
-                                <option value="4">4</option>
-                                <option value="5">5+</option>
-                            </select>
+                            <input type="number" id="numberOfPeople" name="numberOfPeople" required min="1" placeholder="Enter number of people">
                         </div>
 
                         <div class="form-group">
                             <label for="jobLocation">Job location:</label>
-                            <select id="jobLocation" name="jobLocation" required>
-                                <option value="">Select location</option>
-                                <option value="Manila">Manila</option>
-                                <option value="Quezon City">Quezon City</option>
-                                <option value="Makati">Makati</option>
-                                <option value="Taguig">Taguig</option>
-                                <option value="Remote">Remote</option>
-                            </select>
+                            <input type="text" id="jobLocation" name="jobLocation" required placeholder="Enter job location">
                         </div>
                     </div>
 
@@ -170,4 +156,4 @@
         });
     </script>
 </body>
-</html> 
+</html>

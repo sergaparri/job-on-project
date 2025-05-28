@@ -5,11 +5,13 @@
     margin: 0;
     padding: 0;
     color: #fff;
+    overflow-x: hidden;
 }
 
 .app-container {
     display: flex;
     min-height: 100vh;
+    position: relative;
 }
 
 /* Sidebar Styles */
@@ -78,12 +80,35 @@
     margin-left: 280px;
     background: linear-gradient(135deg, #0A0E2C 0%, #14183E 100%);
     min-height: 100vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #00E676 rgba(255, 255, 255, 0.1);
+}
+
+/* Scrollbar styles for webkit browsers */
+.main-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.main-content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.main-content::-webkit-scrollbar-thumb {
+    background: #00E676;
+    border-radius: 4px;
+}
+
+.main-content::-webkit-scrollbar-thumb:hover {
+    background: #00ff85;
 }
 
 .jobs-container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 1rem;
+    width: 100%;
 }
 
 .jobs-header {
@@ -208,6 +233,26 @@
     display: grid;
     gap: 1.5rem;
     grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+}
+
+/* Make jobs-list scrollable */
+.jobs-list {
+    max-height: 70vh; /* Adjust as needed */
+    overflow-y: auto;
+    padding-right: 8px; /* Space for scrollbar */
+}
+
+/* Optional: Custom scrollbar for jobs-list */
+.jobs-list::-webkit-scrollbar {
+    width: 8px;
+}
+.jobs-list::-webkit-scrollbar-thumb {
+    background: #00E676;
+    border-radius: 4px;
+}
+.jobs-list::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
 }
 
 .job-card {
@@ -660,4 +705,4 @@
         opacity: 1;
         transform: translateY(0);
     }
-} 
+}

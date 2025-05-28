@@ -77,6 +77,25 @@
     padding: 2.5rem;
     margin-left: 280px;
     background: linear-gradient(135deg, #0A0E2C 0%, #14183E 100%);
+    overflow-y: auto;
+    max-height: 100vh;
+    /* Optional: custom scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: #00E676 rgba(255,255,255,0.1);
+}
+
+.main-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.main-content::-webkit-scrollbar-thumb {
+    background: #00E676;
+    border-radius: 4px;
+}
+
+.main-content::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
 }
 
 .profile-card {
@@ -442,4 +461,4 @@
 
 .rotating {
     animation: rotate 1s linear infinite;
-} 
+}

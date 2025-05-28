@@ -686,23 +686,23 @@ apiRouter.get('/notifications', authenticateToken, (req, res) => {
     let query;
     if (userType === 'employer') {
         query = `
-            SELECT 
-                n.id,
-                n.status,
-                n.is_read,
-                n.created_at as createdAt,
-                j.job_title as jobTitle,
-                u.first_name,
-                u.last_name,
-                u.email,
-                p.resume_url
-            FROM notifications n
-            JOIN jobs j ON n.job_id = j.id
-            JOIN users u ON n.applicant_id = u.id
-            LEFT JOIN profiles p ON u.id = p.user_id
-            WHERE n.employer_id = ?
-            ORDER BY n.created_at DESC
-        `;
+        SELECT 
+            n.id,
+            n.status,
+            n.is_read,
+            n.created_at as createdAt,
+            j.job_title as jobTitle,
+            u.first_name,
+            u.last_name,
+            u.email,
+            p.resume_url
+        FROM notifications n
+        JOIN jobs j ON n.job_id = j.id
+        JOIN users u ON n.applicant_id = u.id
+        LEFT JOIN profiles p ON u.id = p.user_id
+        WHERE n.employer_id = ?
+        ORDER BY n.created_at DESC
+    `;
     } else {
         query = `
             SELECT 
@@ -738,16 +738,16 @@ apiRouter.get('/notifications', authenticateToken, (req, res) => {
         const notifications = results.map(notification => {
             if (userType === 'employer') {
                 return {
-                    id: notification.id,
-                    jobTitle: notification.jobTitle,
-                    status: notification.status,
-                    isRead: notification.is_read === 1,
-                    createdAt: notification.createdAt,
-                    applicant: {
-                        name: `${notification.first_name} ${notification.last_name}`,
-                        email: notification.email,
-                        resumeUrl: notification.resume_url
-                    }
+            id: notification.id,
+            jobTitle: notification.jobTitle,
+            status: notification.status,
+            isRead: notification.is_read === 1,
+            createdAt: notification.createdAt,
+            applicant: {
+                name: `${notification.first_name} ${notification.last_name}`,
+                email: notification.email,
+                resumeUrl: notification.resume_url
+            }
                 };
             } else {
                 return {
@@ -851,9 +851,9 @@ apiRouter.put('/notifications/:id/status', authenticateToken, async (req, res) =
                         return db.rollback(() => {
                             res.status(500).json({ error: 'Failed to update notification status' });
                         });
-                    }
+        }
 
-                    if (result.affectedRows === 0) {
+        if (result.affectedRows === 0) {
                         console.error('No rows affected in status update');
                         return db.rollback(() => {
                             res.status(404).json({ error: 'Failed to update notification status - no matching record found' });
