@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -34,7 +34,7 @@
                     <a href="/post-job.html"><span class="material-icons">work</span>Post Job</a>
                 </li>
                 <li>
-                    <a href="#"><span class="material-icons">settings</span>Settings</a>
+                    <a href="/settings.html"><span class="material-icons">settings</span>Settings</a>
                 </li>
             </ul>
         </nav>
@@ -116,6 +116,87 @@
         </div>
     </template>
 
+    <!-- Filter Modal -->
+    <div id="filterModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Filter Jobs</h2>
+                <button class="close-modal">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <form id="filterForm" class="filter-form">
+                <div class="form-group">
+                    <label for="jobType">Job Type</label>
+                    <select id="jobType" name="jobType">
+                        <option value="">All Types</option>
+                        <option value="full-time">Full Time</option>
+                        <option value="part-time">Part Time</option>
+                        <option value="contract">Contract</option>
+                        <option value="internship">Internship</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="experienceLevel">Experience Level</label>
+                    <select id="experienceLevel" name="experienceLevel">
+                        <option value="">All Levels</option>
+                        <option value="entry">Entry Level</option>
+                        <option value="mid">Mid Level</option>
+                        <option value="senior">Senior Level</option>
+                        <option value="executive">Executive Level</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="salaryRange">Salary Range</label>
+                    <div class="salary-range-inputs">
+                        <input type="number" id="minSalary" name="minSalary" placeholder="Min">
+                        <span>to</span>
+                        <input type="number" id="maxSalary" name="maxSalary" placeholder="Max">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="location">Location</label>
+                    <input type="text" id="location" name="location" placeholder="Enter location">
+                </div>
+
+                <div class="form-group">
+                    <label>Skills</label>
+                    <div class="skills-input">
+                        <input type="text" id="skillInput" placeholder="Add skills">
+                        <button type="button" id="addSkillBtn">
+                            <span class="material-icons">add</span>
+                        </button>
+                    </div>
+                    <div id="skillsList" class="skills-list"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Posted Within</label>
+                    <select id="postedWithin" name="postedWithin">
+                        <option value="">Any Time</option>
+                        <option value="1">Last 24 Hours</option>
+                        <option value="7">Last 7 Days</option>
+                        <option value="30">Last 30 Days</option>
+                    </select>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" id="clearFiltersBtn" class="secondary-btn">
+                        <span class="material-icons">clear_all</span>
+                        Clear Filters
+                    </button>
+                    <button type="submit" class="primary-btn">
+                        <span class="material-icons">filter_list</span>
+                        Apply Filters
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         // Check authentication
         const token = localStorage.getItem('token');
@@ -180,6 +261,17 @@
             console.log('Creating job card with data:', job); // Debug log
             const card = jobCardTemplate.content.cloneNode(true);
             
+            // Store job data for filtering
+            const jobCard = card.querySelector('.job-card');
+            jobCard.dataset.jobData = JSON.stringify({
+                type: job.type,
+                experienceLevel: job.experienceLevel,
+                salaryRange: job.salaryRange,
+                location: job.location,
+                requiredSkills: job.requiredSkills,
+                createdAt: job.createdAt
+            });
+
             // Fill in the job details
             card.querySelector('.job-title').textContent = job.title;
             card.querySelector('.location-text').textContent = job.location;
@@ -379,6 +471,143 @@
                 });
             }, 300); // Debounce search for better performance
         });
+
+        // Filter functionality
+        const filterBtn = document.querySelector('.filter-btn');
+        const filterModal = document.getElementById('filterModal');
+        const closeModal = document.querySelector('.close-modal');
+        const filterForm = document.getElementById('filterForm');
+        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+        const skillInput = document.getElementById('skillInput');
+        const addSkillBtn = document.getElementById('addSkillBtn');
+        const skillsList = document.getElementById('skillsList');
+        let selectedSkills = new Set();
+
+        // Open filter modal
+        filterBtn.addEventListener('click', () => {
+            filterModal.style.display = 'flex';
+        });
+
+        // Close filter modal
+        closeModal.addEventListener('click', () => {
+            filterModal.style.display = 'none';
+        });
+
+        // Close modal when clicking outside
+        window.addEventListener('click', (e) => {
+            if (e.target === filterModal) {
+                filterModal.style.display = 'none';
+            }
+        });
+
+        // Add skill
+        function addSkill(skill) {
+            if (skill && !selectedSkills.has(skill)) {
+                selectedSkills.add(skill);
+                const skillTag = document.createElement('div');
+                skillTag.className = 'skill-tag';
+                skillTag.innerHTML = `
+                    ${skill}
+                    <button type="button" class="remove-skill">
+                        <span class="material-icons">close</span>
+                    </button>
+                `;
+                skillsList.appendChild(skillTag);
+
+                // Add remove skill functionality
+                skillTag.querySelector('.remove-skill').addEventListener('click', () => {
+                    selectedSkills.delete(skill);
+                    skillTag.remove();
+                });
+            }
+        }
+
+        // Add skill button click
+        addSkillBtn.addEventListener('click', () => {
+            const skill = skillInput.value.trim();
+            addSkill(skill);
+            skillInput.value = '';
+        });
+
+        // Add skill on enter
+        skillInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const skill = skillInput.value.trim();
+                addSkill(skill);
+                skillInput.value = '';
+            }
+        });
+
+        // Clear filters
+        clearFiltersBtn.addEventListener('click', () => {
+            filterForm.reset();
+            selectedSkills.clear();
+            skillsList.innerHTML = '';
+            applyFilters();
+        });
+
+        // Apply filters
+        filterForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            applyFilters();
+            filterModal.style.display = 'none';
+        });
+
+        // Filter jobs
+        function applyFilters() {
+            const formData = new FormData(filterForm);
+            const filters = {
+                jobType: formData.get('jobType'),
+                experienceLevel: formData.get('experienceLevel'),
+                minSalary: formData.get('minSalary'),
+                maxSalary: formData.get('maxSalary'),
+                location: formData.get('location'),
+                skills: Array.from(selectedSkills),
+                postedWithin: formData.get('postedWithin')
+            };
+
+            const jobCards = jobsList.getElementsByClassName('job-card');
+            Array.from(jobCards).forEach(card => {
+                const jobData = JSON.parse(card.dataset.jobData);
+                let show = true;
+
+                // Apply filters
+                if (filters.jobType && jobData.type !== filters.jobType) show = false;
+                if (filters.experienceLevel && jobData.experienceLevel !== filters.experienceLevel) show = false;
+                if (filters.minSalary && jobData.salaryRange.min < filters.minSalary) show = false;
+                if (filters.maxSalary && jobData.salaryRange.max > filters.maxSalary) show = false;
+                if (filters.location && !jobData.location.toLowerCase().includes(filters.location.toLowerCase())) show = false;
+                if (filters.skills.length > 0 && !filters.skills.every(skill => 
+                    jobData.requiredSkills.some(jobSkill => 
+                        jobSkill.toLowerCase().includes(skill.toLowerCase())
+                    )
+                )) show = false;
+                if (filters.postedWithin) {
+                    const postedDate = new Date(jobData.createdAt);
+                    const now = new Date();
+                    const daysDiff = Math.floor((now - postedDate) / (1000 * 60 * 60 * 24));
+                    if (daysDiff > filters.postedWithin) show = false;
+                }
+
+                card.style.display = show ? 'block' : 'none';
+            });
+
+            // Show no results message if all jobs are filtered out
+            const visibleJobs = Array.from(jobCards).filter(card => card.style.display !== 'none');
+            if (visibleJobs.length === 0) {
+                jobsList.innerHTML = `
+                    <div class="no-jobs">
+                        <span class="material-icons">filter_alt_off</span>
+                        <p>No jobs match your filters</p>
+                        <button onclick="clearFilters()" class="clear-filters-btn">
+                            <span class="material-icons">clear_all</span>
+                            Clear Filters
+                        </button>
+                    </div>
+                `;
+            }
+        }
 
         // Load jobs when page loads
         fetchJobs();

@@ -7,6 +7,92 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/profile.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        .profile-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .form-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #fff;
+        }
+        .form-group input,
+        .form-group textarea {
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            font-size: 1rem;
+        }
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #00E676;
+        }
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        .save-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: #00E676;
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        .save-btn:hover {
+            background: #00C853;
+        }
+        .save-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .success-message {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: rgba(0, 230, 118, 0.1);
+            border: 1px solid #00E676;
+            border-radius: 8px;
+            color: #00E676;
+            margin-bottom: 20px;
+        }
+        .error-message {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            background: rgba(220, 53, 69, 0.1);
+            border: 1px solid #dc3545;
+            border-radius: 8px;
+            color: #dc3545;
+            margin-bottom: 20px;
+        }
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .rotating {
+            animation: rotate 1s linear infinite;
+        }
+    </style>
 </head>
 <body class="profile-page">
     <div class="app-container">
@@ -29,7 +115,7 @@
                     <a href="/post-job.html"><span class="material-icons">work</span>Post Job</a>
                 </li>
                 <li>
-                    <a href="#"><span class="material-icons">settings</span>Settings</a>
+                    <a href="/settings.html"><span class="material-icons">settings</span>Settings</a>
                 </li>
             </ul>
         </nav>
@@ -38,7 +124,7 @@
         <main class="main-content">
             <div class="profile-card">
                 <div class="profile-header">
-                    <h1 id="userName">Loading...</h1>
+                    <h1>Company Profile</h1>
                     <button id="logoutBtn" class="logout-btn">
                         <span class="material-icons">logout</span>
                         Logout
@@ -46,29 +132,54 @@
                 </div>
                 
                 <div class="profile-info">
-                    <div class="info-item">
-                        <span class="material-icons">email</span>
-                        <span id="userEmail">Loading...</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="material-icons">phone</span>
-                        <span id="userPhone">Loading...</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="material-icons">business</span>
-                        <span id="companyName">Loading...</span>
-                    </div>
-                </div>
-
-                <div class="company-info">
-                    <h2>Company Description</h2>
-                    <div class="form-group">
-                        <textarea id="companyDescription" rows="4" placeholder="Describe your company..."></textarea>
-                        <button id="updateCompanyInfo" class="submit-btn">
+                    <form id="profileForm" class="profile-form">
+                        <div class="form-group">
+                            <label>
+                                <span class="material-icons">person</span>
+                                First Name
+                            </label>
+                            <input type="text" id="firstName" name="firstName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <span class="material-icons">person</span>
+                                Last Name
+                            </label>
+                            <input type="text" id="lastName" name="lastName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <span class="material-icons">email</span>
+                                Email
+                            </label>
+                            <input type="email" id="userEmail" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <span class="material-icons">phone</span>
+                                Phone
+                            </label>
+                            <input type="tel" id="userPhone" name="phone">
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <span class="material-icons">business</span>
+                                Company Name
+                            </label>
+                            <input type="text" id="companyName" name="companyName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <span class="material-icons">description</span>
+                                Company Description
+                            </label>
+                            <textarea id="companyDescription" name="companyDescription" required></textarea>
+                        </div>
+                        <button type="submit" class="save-btn">
                             <span class="material-icons">save</span>
-                            Update Information
+                            Save Changes
                         </button>
-                    </div>
+                    </form>
                 </div>
             </div>
         </main>
@@ -84,12 +195,13 @@
         }
 
         // DOM Elements
-        const userNameElement = document.getElementById('userName');
-        const userEmailElement = document.getElementById('userEmail');
-        const userPhoneElement = document.getElementById('userPhone');
-        const companyNameElement = document.getElementById('companyName');
-        const companyDescriptionElement = document.getElementById('companyDescription');
-        const updateCompanyInfo = document.getElementById('updateCompanyInfo');
+        const profileForm = document.getElementById('profileForm');
+        const firstNameInput = document.getElementById('firstName');
+        const lastNameInput = document.getElementById('lastName');
+        const userEmailInput = document.getElementById('userEmail');
+        const userPhoneInput = document.getElementById('userPhone');
+        const companyNameInput = document.getElementById('companyName');
+        const companyDescriptionInput = document.getElementById('companyDescription');
         const logoutBtn = document.getElementById('logoutBtn');
 
         // Load profile data
@@ -107,42 +219,90 @@
 
                 const data = await response.json();
                 
-                // Update the UI with user data
-                userNameElement.textContent = `${data.firstName} ${data.lastName}`;
-                userEmailElement.textContent = data.email;
-                userPhoneElement.textContent = data.phone || 'Not provided';
-                companyNameElement.textContent = data.companyName || 'Not provided';
-                companyDescriptionElement.value = data.companyDescription || '';
+                // Update the form with user data
+                firstNameInput.value = data.firstName || '';
+                lastNameInput.value = data.lastName || '';
+                userEmailInput.value = data.email || '';
+                userPhoneInput.value = data.phone || '';
+                companyNameInput.value = data.companyName || '';
+                companyDescriptionInput.value = data.companyDescription || '';
             } catch (error) {
                 console.error('Error:', error);
-                alert('Failed to load profile data. Please try again later.');
+                showError('Failed to load profile data. Please try again later.');
             }
         }
 
-        // Update company information
-        updateCompanyInfo.addEventListener('click', async () => {
+        // Show success message
+        function showSuccess(message) {
+            const successMessage = document.createElement('div');
+            successMessage.className = 'success-message';
+            successMessage.innerHTML = `
+                <span class="material-icons">check_circle</span>
+                ${message}
+            `;
+            profileForm.insertBefore(successMessage, profileForm.firstChild);
+            
+            setTimeout(() => {
+                successMessage.remove();
+            }, 3000);
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorMessage = document.createElement('div');
+            errorMessage.className = 'error-message';
+            errorMessage.innerHTML = `
+                <span class="material-icons">error</span>
+                ${message}
+            `;
+            profileForm.insertBefore(errorMessage, profileForm.firstChild);
+            
+            setTimeout(() => {
+                errorMessage.remove();
+            }, 3000);
+        }
+
+        // Handle form submission
+        profileForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Show loading state
+            const saveBtn = e.target.querySelector('.save-btn');
+            const originalBtnText = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<span class="material-icons rotating">refresh</span> Saving...';
+            saveBtn.disabled = true;
+
             try {
-                const response = await fetch('/api/update-company', {
+                const response = await fetch('/api/update-employer-profile', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        description: companyDescriptionElement.value
+                        firstName: firstNameInput.value.trim(),
+                        lastName: lastNameInput.value.trim(),
+                        phone: userPhoneInput.value.trim(),
+                        companyName: companyNameInput.value.trim(),
+                        companyDescription: companyDescriptionInput.value.trim()
                     })
                 });
 
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.error || 'Failed to update company information');
+                    throw new Error(data.error || 'Failed to update profile');
                 }
 
-                alert('Company information updated successfully!');
+                showSuccess(data.message || 'Profile updated successfully');
+
             } catch (error) {
                 console.error('Error:', error);
-                alert(error.message || 'Failed to update company information');
+                showError(error.message || 'Failed to update profile. Please try again.');
+            } finally {
+                // Restore button state
+                saveBtn.innerHTML = originalBtnText;
+                saveBtn.disabled = false;
             }
         });
 

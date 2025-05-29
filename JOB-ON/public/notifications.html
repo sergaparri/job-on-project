@@ -34,7 +34,7 @@
                     <a href="/post-job.html"><span class="material-icons">work</span>Post Job</a>
                 </li>
                 <li>
-                    <a href="#"><span class="material-icons">settings</span>Settings</a>
+                    <a href="/settings.html"><span class="material-icons">settings</span>Settings</a>
                 </li>
             </ul>
         </nav>
@@ -167,25 +167,31 @@
         // Display notifications
         function displayNotifications(notifications) {
             const currentFilter = document.querySelector('.filter-btn.active').dataset.filter;
-            
             const filteredNotifications = currentFilter === 'all' 
                 ? notifications 
                 : notifications.filter(n => n.status === currentFilter);
 
             notificationsList.innerHTML = filteredNotifications.map(notification => {
                 if (userType === 'employer') {
+                    // Show applicant info for employers
+                    const applicantName = notification.applicant && notification.applicant.name ? notification.applicant.name : 'N/A';
+                    const applicantEmail = notification.applicant && notification.applicant.email ? notification.applicant.email : 'N/A';
+                    const resumeUrl = notification.applicant && notification.applicant.resumeUrl;
                     return `
                         <div class="notification-card ${notification.isRead ? 'read' : 'unread'}" data-id="${notification.id}">
                             <div class="notification-header">
                                 <h3>${notification.jobTitle}</h3>
                                 <span class="status-badge ${notification.status}">${notification.status}</span>
+                                <button class="delete-notification-btn" title="Delete Notification" data-id="${notification.id}">
+                                    <span class="material-icons">delete</span>
+                                </button>
                             </div>
                             <div class="notification-content">
                                 <div class="applicant-info">
-                                    <p><span class="material-icons">person</span> ${notification.applicant.name}</p>
-                                    <p><span class="material-icons">email</span> ${notification.applicant.email}</p>
-                                    ${notification.applicant.resumeUrl ? 
-                                        `<a href="${notification.applicant.resumeUrl}" target="_blank" class="resume-link">
+                                    <p><span class="material-icons">person</span> ${applicantName}</p>
+                                    <p><span class="material-icons">email</span> ${applicantEmail}</p>
+                                    ${resumeUrl ? 
+                                        `<a href="${resumeUrl}" target="_blank" class="resume-link">
                                             <span class="material-icons">description</span> View Resume
                                         </a>` : 
                                         '<p class="no-resume">No resume uploaded</p>'
@@ -217,34 +223,26 @@
                         </div>
                     `;
                 } else {
+                    // Show job info for job seekers
+                    const employerName = notification.employerName;
+                    const jobDescription = notification.jobDescription;
                     return `
                         <div class="notification-card ${notification.isRead ? 'read' : 'unread'}" data-id="${notification.id}">
                             <div class="notification-header">
                                 <h3>${notification.jobTitle}</h3>
                                 <span class="status-badge ${notification.status}">${notification.status}</span>
+                                <button class="delete-notification-btn" title="Delete Notification" data-id="${notification.id}">
+                                    <span class="material-icons">delete</span>
+                                </button>
                             </div>
                             <div class="notification-content">
                                 <div class="job-info">
-                                    <p class="job-description">${notification.jobDescription}</p>
-                                    <div class="job-meta">
-                                        <p><span class="material-icons">location_on</span> ${notification.jobLocation}</p>
-                                        <p><span class="material-icons">payments</span> ${formatSalary(notification.salaryRange.min)} - ${formatSalary(notification.salaryRange.max)}</p>
-                                    </div>
-                                </div>
-                                <div class="employer-info">
-                                    <h4>${notification.employer.company.name}</h4>
-                                    <p>${notification.employer.company.description}</p>
-                                    <p><span class="material-icons">person</span> ${notification.employer.name}</p>
-                                    <p><span class="material-icons">email</span> ${notification.employer.email}</p>
+                                    ${employerName ? `<p><span class="material-icons">business</span> ${employerName}</p>` : ''}
+                                    ${jobDescription ? `<p><span class="material-icons">description</span> ${jobDescription}</p>` : ''}
                                 </div>
                             </div>
                             <div class="notification-footer">
                                 <span class="timestamp">Applied ${timeAgo(new Date(notification.createdAt))}</span>
-                                <span class="status-text">
-                                    ${notification.status === 'pending' ? 'Application under review' :
-                                      notification.status === 'accepted' ? 'Application accepted! The employer will contact you soon.' :
-                                      'Application rejected'}
-                                </span>
                             </div>
                             <div class="comments-section" data-notification-id="${notification.id}">
                                 <div class="comments-list"></div>
@@ -263,6 +261,26 @@
             // Load comments for each notification
             document.querySelectorAll('.comments-section').forEach(section => {
                 loadComments(section.dataset.notificationId);
+            });
+
+            // Add event listeners for delete buttons
+            document.querySelectorAll('.delete-notification-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const id = btn.dataset.id;
+                    if (confirm('Delete this notification?')) {
+                        try {
+                            const res = await fetch(`/api/notifications/${id}`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (!res.ok) throw new Error('Failed to delete notification');
+                        await loadNotifications();
+                        } catch (err) {
+                            alert('Error deleting notification');
+                        }
+                    }
+                });
             });
         }
 
@@ -446,6 +464,11 @@
                             <button class="reply-btn">
                                 <span class="material-icons">reply</span> Reply
                             </button>
+                            ${comment.user && comment.user.id == JSON.parse(atob(token.split('.')[1])).id ? `
+                                <button class="delete-comment-btn" title="Delete Comment" data-comment-id="${comment.id}">
+                                    <span class="material-icons">delete</span>
+                                </button>
+                            ` : ''}
                         ` : ''}
                     </div>
                     <div class="replies">
@@ -538,6 +561,25 @@
                     }
                 });
             });
+
+            // Delete comment handlers
+            section.querySelectorAll('.delete-comment-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const commentId = btn.dataset.commentId;
+                    if (confirm('Delete this comment?')) {
+                        try {
+                            const res = await fetch(`/api/notifications/${notificationId}/comments/${commentId}`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (!res.ok) throw new Error('Failed to delete comment');
+                        await loadComments(notificationId);
+                        } catch (err) {
+                            alert('Error deleting comment');
+                        }
+                    }
+                });
+            });
         }
 
         // Function to load user notifications
@@ -578,6 +620,9 @@
                             <p>${notification.message}</p>
                             <span class="notification-time">${timeAgo(new Date(notification.created_at))}</span>
                         </div>
+                        <button class="delete-user-notification-btn" title="Delete Notification" data-id="${notification.id}">
+                            <span class="material-icons">delete</span>
+                        </button>
                     </div>
                 `).join('');
 
@@ -601,6 +646,29 @@
                             }
                         } catch (error) {
                             console.error('Error marking notification as read:', error);
+                        }
+                    });
+                });
+
+                // Add delete handler for user notifications
+                userNotificationsContainer.querySelectorAll('.delete-user-notification-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        const notifId = btn.dataset.id;
+                        if (confirm('Delete this notification?')) {
+                            try {
+                                const response = await fetch(`/api/user-notifications/${notifId}`, {
+                                    method: 'DELETE',
+                                    headers: {
+                                        'Authorization': `Bearer ${token}`,
+                                        'Accept': 'application/json'
+                                    }
+                                });
+                                if (!response.ok) throw new Error('Failed to delete notification');
+                                loadUserNotifications();
+                            } catch (error) {
+                                alert('Error deleting notification');
+                            }
                         }
                     });
                 });
@@ -635,4 +703,4 @@
         });
     </script>
 </body>
-</html> 
+</html>

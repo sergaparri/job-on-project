@@ -26,7 +26,7 @@
                     <a href="/seeker-profile.html"><span class="material-icons">person</span>Profile</a>
                 </li>
                 <li>
-                    <a href="#"><span class="material-icons">settings</span>Settings</a>
+                    <a href="/settings.html"><span class="material-icons">settings</span>Settings</a>
                 </li>
             </ul>
         </nav>
@@ -85,17 +85,43 @@
                         <input type="file" id="resumeFile" accept=".pdf,.doc,.docx" style="display: none;">
                         <div id="currentResume" style="display: none;" class="current-resume">
                             <span class="material-icons">description</span>
-                            <a href="#" target="_blank" id="resumeLink">View Current Resume</a>
-                            <button class="delete-resume" id="deleteResume">
+                            <div class="resume-info">
+                                <a href="#" target="_blank" id="resumeLink">View Current Resume</a>
+                                <span id="resumeSize" class="resume-size"></span>
+                            </div>
+                            <button class="delete-resume" id="deleteResume" title="Delete Resume">
                                 <span class="material-icons">delete</span>
                             </button>
                         </div>
-                        <button id="uploadResumeBtn" class="upload-btn">
-                            <span class="material-icons">upload_file</span>
-                            Upload resume
-                        </button>
-                        <p class="upload-info">Supported formats: PDF, DOC, DOCX (Max 5MB)</p>
+                        <div class="upload-zone" id="uploadZone">
+                            <span class="material-icons upload-icon">cloud_upload</span>
+                            <p class="upload-text">Drag and drop your resume here or</p>
+                            <button id="uploadResumeBtn" class="upload-btn">
+                                <span class="material-icons">upload_file</span>
+                                Choose File
+                            </button>
+                            <p class="upload-info">Supported formats: PDF, DOC, DOCX (Max 5MB)</p>
+                        </div>
                         <div id="uploadError" class="upload-error" style="display: none;"></div>
+                        <div id="uploadProgress" class="upload-progress" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill"></div>
+                            </div>
+                            <span class="progress-text">0%</span>
+                        </div>
+                        <div id="filePreview" class="file-preview" style="display: none;">
+                            <div class="preview-header">
+                                <span class="material-icons">description</span>
+                                <span class="file-name"></span>
+                                <button class="remove-file" title="Remove file">
+                                    <span class="material-icons">close</span>
+                                </button>
+                            </div>
+                            <div class="preview-info">
+                                <span class="file-size"></span>
+                                <span class="file-type"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -103,14 +129,31 @@
     </div>
 
     <script>
-        // Check authentication
-        const token = localStorage.getItem('token');
-        const userType = localStorage.getItem('userType');
-
-        if (!token || userType !== 'job_seeker') {
-            window.location.replace('/login.html');
-            throw new Error('Not authenticated');
+        // Authentication check function
+        function checkAuth() {
+            try {
+                const token = localStorage.getItem('token');
+                const userType = localStorage.getItem('userType');
+                
+                if (!token || userType !== 'job_seeker') {
+                    window.location.href = '/login.html';
+                    return false;
+                }
+                return { token, userType };
+            } catch (error) {
+                console.error('Storage access error:', error);
+                window.location.href = '/login.html';
+                return false;
+            }
         }
+
+        // Initialize auth state
+        const auth = checkAuth();
+        if (!auth) {
+            throw new Error('Authentication failed');
+        }
+
+        const { token, userType } = auth;
 
         // DOM Elements
         const profileForm = document.getElementById('profileForm');
@@ -130,72 +173,29 @@
         // Fetch user profile data
         async function fetchUserProfile() {
             try {
-                // First check if we have a valid token
-                if (!token) {
-                    window.location.replace('/login.html');
-                    throw new Error('Not authenticated. Please log in.');
-                }
-
-                console.log('Fetching profile with token:', token); // Debug log
-
                 const response = await fetch('/api/profile', {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json',
-                        'Cache-Control': 'no-cache'
-                    },
-                    credentials: 'same-origin'
+                        'Accept': 'application/json'
+                    }
                 });
-
-                console.log('Response status:', response.status); // Debug log
-                console.log('Response headers:', Object.fromEntries(response.headers.entries())); // Debug log
-
-                // Check if we're redirected to login page
-                if (response.redirected) {
-                    console.log('Redirected to:', response.url); // Debug log
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('userType');
-                    window.location.replace('/login.html');
-                    throw new Error('Session expired. Please log in again.');
-                }
-
-                const contentType = response.headers.get('content-type');
-                console.log('Content-Type:', contentType); // Debug log
-                
-                if (!contentType || !contentType.includes('application/json')) {
-                    console.error('Invalid content type:', contentType);
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('userType');
-                    window.location.replace('/login.html');
-                    throw new Error('Invalid response from server. Please log in again.');
-                }
-
-                const text = await response.text();
-                console.log('Raw response:', text); // Debug log
-
-                let data;
-                try {
-                    data = JSON.parse(text);
-                } catch (parseError) {
-                    console.error('JSON Parse Error:', parseError);
-                    throw new Error('Invalid response format from server');
-                }
 
                 if (!response.ok) {
                     if (response.status === 401 || response.status === 403) {
-                        localStorage.removeItem('token');
-                        localStorage.removeItem('userType');
-                        window.location.replace('/login.html');
+                        try {
+                            localStorage.removeItem('token');
+                            localStorage.removeItem('userType');
+                        } catch (error) {
+                            console.error('Storage access error:', error);
+                        }
+                        window.location.href = '/login.html';
+                        return;
                     }
-                    throw new Error(data.error || 'Failed to load profile data');
+                    throw new Error('Failed to load profile data');
                 }
 
-                if (!data) {
-                    throw new Error('No profile data received');
-                }
-
-                console.log('Parsed profile data:', data); // Debug log
+                const data = await response.json();
                 
                 // Update the form with user data
                 firstNameInput.value = data.firstName || '';
@@ -207,47 +207,22 @@
                 if (data.resumeUrl) {
                     currentResume.style.display = 'flex';
                     resumeLink.href = data.resumeUrl;
-                    uploadResumeBtn.textContent = 'Update Resume';
+                    resumeLink.target = '_blank';
+                    uploadResumeBtn.innerHTML = '<span class="material-icons">upload_file</span> Update Resume';
+                    
+                    // Show the current resume section and hide the upload zone
+                    document.getElementById('uploadZone').style.display = 'none';
+                    currentResume.style.display = 'flex';
                 } else {
                     currentResume.style.display = 'none';
-                    uploadResumeBtn.textContent = 'Upload Resume';
+                    document.getElementById('uploadZone').style.display = 'block';
+                    uploadResumeBtn.innerHTML = '<span class="material-icons">upload_file</span> Upload Resume';
                 }
+
             } catch (error) {
                 console.error('Profile fetch error:', error);
-                
-                // If we have a storage access error or we're not authenticated, redirect to login
-                if (error.message.includes('Access to storage is not allowed') || 
-                    error.message.includes('Not authenticated')) {
-                    return; // Don't show error message as we're redirecting
-                }
-
-                const errorMessage = document.createElement('div');
-                errorMessage.className = 'error-message';
-                errorMessage.innerHTML = 
-                    '<span class="material-icons">error_outline</span>' +
-                    '<span class="error-text">' + error.message + '</span>' +
-                    '<button onclick="retryFetchProfile()" class="retry-btn">' +
-                    '<span class="material-icons">refresh</span>' +
-                    'Retry' +
-                    '</button>';
-                
-                // Remove any existing error messages
-                const existingError = profileForm.querySelector('.error-message');
-                if (existingError) {
-                    existingError.remove();
-                }
-                
-                profileForm.insertBefore(errorMessage, profileForm.firstChild);
+                showError(error.message || 'Failed to load profile data');
             }
-        }
-
-        // Retry function for profile fetch
-        async function retryFetchProfile() {
-            const existingError = profileForm.querySelector('.error-message');
-            if (existingError) {
-                existingError.remove();
-            }
-            await fetchUserProfile();
         }
 
         // Add some basic styles for the error message
@@ -284,6 +259,43 @@
             .retry-btn:hover {
                 background-color: #b91c1c;
             }
+            .view-resume {
+                background: none;
+                border: none;
+                color: #00E676;
+                cursor: pointer;
+                padding: 0.5rem;
+                border-radius: 50%;
+                transition: all 0.3s ease;
+                margin-left: 0.5rem;
+            }
+            .view-resume:hover {
+                background: rgba(0, 230, 118, 0.1);
+                transform: translateY(-2px);
+            }
+            .current-resume {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                padding: 1rem;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 8px;
+                margin-bottom: 1rem;
+            }
+            .current-resume a {
+                color: #00E676;
+                text-decoration: none;
+                flex: 1;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+            .current-resume a:hover {
+                text-decoration: underline;
+            }
+            .current-resume .material-icons {
+                font-size: 1.2rem;
+            }
         `;
         document.head.appendChild(style);
 
@@ -296,10 +308,6 @@
             const originalBtnText = saveBtn.innerHTML;
             saveBtn.innerHTML = '<span class="material-icons rotating">refresh</span> Saving...';
             saveBtn.disabled = true;
-
-            // Remove any existing messages
-            const existingMessages = profileForm.querySelectorAll('.success-message, .error-message');
-            existingMessages.forEach(msg => msg.remove());
 
             try {
                 const response = await fetch('/api/update-profile', {
@@ -328,66 +336,185 @@
                     userPhoneInput.value = data.user.phone || '';
                 }
 
-                // Show success message
-                const successMessage = document.createElement('div');
-                successMessage.className = 'success-message';
-                successMessage.innerHTML = `
-                    <span class="material-icons">check_circle</span>
-                    ${data.message || 'Profile updated successfully'}
-                `;
-                profileForm.appendChild(successMessage);
+                showSuccess(data.message || 'Profile updated successfully');
 
             } catch (error) {
                 console.error('Error:', error);
-                
-                // Show error message
-                const errorMessage = document.createElement('div');
-                errorMessage.className = 'error-message';
-                errorMessage.innerHTML = `
-                    <span class="material-icons">error_outline</span>
-                    ${error.message || 'Failed to update profile. Please try again.'}
-                `;
-                profileForm.appendChild(errorMessage);
+                showError(error.message || 'Failed to update profile. Please try again.');
             } finally {
                 // Restore button state
                 saveBtn.innerHTML = originalBtnText;
                 saveBtn.disabled = false;
-
-                // Remove messages after 3 seconds
-                setTimeout(() => {
-                    const messages = profileForm.querySelectorAll('.success-message, .error-message');
-                    messages.forEach(msg => msg.remove());
-                }, 3000);
             }
         });
 
         // Load user profile when page loads
         fetchUserProfile();
 
-        // Resume upload handler
+        // Format file size
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Get file type icon
+        function getFileTypeIcon(fileType) {
+            switch (fileType.toLowerCase()) {
+                case 'pdf':
+                    return 'picture_as_pdf';
+                case 'doc':
+                case 'docx':
+                    return 'description';
+                default:
+                    return 'insert_drive_file';
+            }
+        }
+
+        // Validate file
+        function validateFile(file) {
+            const allowedTypes = ['.pdf', '.doc', '.docx'];
+            const maxSize = 5 * 1024 * 1024; // 5MB
+            const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+            
+            if (!allowedTypes.includes(fileExt)) {
+                throw new Error('Invalid file type. Please upload PDF, DOC, or DOCX files only.');
+            }
+            
+            if (file.size > maxSize) {
+                throw new Error('File size exceeds 5MB limit');
+            }
+            
+            return true;
+        }
+
+        // Handle file selection
+        function handleFileSelect(file) {
+            try {
+                validateFile(file);
+                
+                // Show file preview
+                const filePreview = document.getElementById('filePreview');
+                const fileName = filePreview.querySelector('.file-name');
+                const fileSize = filePreview.querySelector('.file-size');
+                const fileType = filePreview.querySelector('.file-type');
+                
+                fileName.textContent = file.name;
+                fileSize.textContent = formatFileSize(file.size);
+                fileType.textContent = file.name.split('.').pop().toUpperCase();
+                
+                filePreview.style.display = 'block';
+                document.getElementById('uploadZone').style.display = 'none';
+                
+                // Automatically start upload when file is selected
+                uploadResume(file);
+                
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        // Show error message
+        function showError(message) {
+            const uploadError = document.getElementById('uploadError');
+            uploadError.textContent = message;
+            uploadError.style.display = 'block';
+            
+            // Hide error after 5 seconds
+            setTimeout(() => {
+                uploadError.style.display = 'none';
+            }, 5000);
+        }
+
+        // Show success message
+        function showSuccess(message) {
+            const successMessage = document.createElement('div');
+            successMessage.className = 'success-message';
+            successMessage.innerHTML = `
+                <span class="material-icons">check_circle</span>
+                ${message}
+            `;
+            uploadArea.appendChild(successMessage);
+            
+            // Remove success message after 3 seconds
+            setTimeout(() => {
+                successMessage.remove();
+            }, 3000);
+        }
+
+        // Initialize drag and drop
+        const uploadZone = document.getElementById('uploadZone');
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                handleFileSelect(file);
+            }
+        });
+
+        // Handle file input change
+        resumeFile.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                handleFileSelect(file);
+            }
+        });
+
+        // Handle remove file button
+        document.querySelector('.remove-file').addEventListener('click', () => {
+            document.getElementById('filePreview').style.display = 'none';
+            document.getElementById('uploadZone').style.display = 'block';
+            resumeFile.value = '';
+            uploadResumeBtn.disabled = true;
+            uploadResumeBtn.innerHTML = '<span class="material-icons">upload_file</span> Choose File';
+        });
+
+        // Update resume upload handler
         uploadResumeBtn.addEventListener('click', () => {
             resumeFile.click();
         });
 
-        resumeFile.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            // Check file size
-            if (file.size > 5 * 1024 * 1024) {
-                uploadError.textContent = 'File size exceeds 5MB limit';
-                uploadError.style.display = 'block';
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('resume', file);
-
+        // Upload resume function
+        async function uploadResume(file) {
             try {
+                validateFile(file);
+
+                const formData = new FormData();
+                formData.append('resume', file);
+
+                // Show loading state
                 uploadArea.classList.add('uploading');
-                uploadResumeBtn.disabled = true;
-                uploadResumeBtn.innerHTML = '<span class="material-icons">hourglass_empty</span> Uploading...';
-                uploadError.style.display = 'none';
+                const uploadProgress = document.getElementById('uploadProgress');
+                const progressFill = uploadProgress.querySelector('.progress-fill');
+                const progressText = uploadProgress.querySelector('.progress-text');
+                
+                uploadProgress.style.display = 'flex';
+                progressFill.style.width = '0%';
+                progressText.textContent = '0%';
+
+                // Simulate upload progress
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += 5;
+                    if (progress <= 90) {
+                        progressFill.style.width = `${progress}%`;
+                        progressText.textContent = `${progress}%`;
+                    }
+                }, 100);
 
                 const response = await fetch('/api/upload-resume', {
                     method: 'POST',
@@ -397,31 +524,43 @@
                     body: formData
                 });
 
-                const data = await response.json();
+                clearInterval(progressInterval);
 
                 if (!response.ok) {
+                    const data = await response.json();
                     throw new Error(data.error || 'Upload failed');
                 }
 
-                // Update UI to show new resume
+                const data = await response.json();
+                
+                // Complete progress bar
+                progressFill.style.width = '100%';
+                progressText.textContent = '100%';
+                
+                // Update UI
                 currentResume.style.display = 'flex';
                 resumeLink.href = data.resumeUrl;
+                resumeLink.target = '_blank';
+                document.getElementById('uploadZone').style.display = 'none';
+                document.getElementById('filePreview').style.display = 'none';
                 uploadResumeBtn.innerHTML = '<span class="material-icons">upload_file</span> Update Resume';
-                
-                // Show success message
-                alert('Resume uploaded successfully!');
+
+                showSuccess('Resume uploaded successfully');
+
+                // Refresh profile data to ensure everything is in sync
+                await fetchUserProfile();
+
             } catch (error) {
                 console.error('Error:', error);
-                uploadError.textContent = error.message || 'Failed to upload resume. Please try again.';
-                uploadError.style.display = 'block';
+                showError(error.message);
+                // Reset UI on error
+                document.getElementById('uploadZone').style.display = 'block';
+                document.getElementById('filePreview').style.display = 'none';
             } finally {
                 uploadArea.classList.remove('uploading');
-                uploadResumeBtn.disabled = false;
-                if (!uploadError.style.display === 'block') {
-                    uploadResumeBtn.innerHTML = '<span class="material-icons">upload_file</span> Upload Resume';
-                }
+                uploadProgress.style.display = 'none';
             }
-        });
+        }
 
         // Delete resume handler
         deleteResume.addEventListener('click', async () => {
@@ -430,6 +569,10 @@
             }
 
             try {
+                // Show loading state
+                deleteResume.disabled = true;
+                deleteResume.innerHTML = '<span class="material-icons rotating">hourglass_empty</span>';
+
                 const response = await fetch('/api/delete-resume', {
                     method: 'DELETE',
                     headers: {
@@ -438,25 +581,71 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error('Failed to delete resume');
+                    const data = await response.json();
+                    throw new Error(data.error || 'Failed to delete resume');
                 }
 
                 // Update UI
                 currentResume.style.display = 'none';
+                document.getElementById('uploadZone').style.display = 'block';
                 uploadResumeBtn.innerHTML = '<span class="material-icons">upload_file</span> Upload Resume';
-                alert('Resume deleted successfully');
+
+                showSuccess('Resume deleted successfully');
+
+                // Refresh profile data to ensure everything is in sync
+                await fetchUserProfile();
+
             } catch (error) {
                 console.error('Error:', error);
-                alert('Failed to delete resume. Please try again.');
+                showError(error.message || 'Failed to delete resume. Please try again.');
+            } finally {
+                // Reset button state
+                deleteResume.disabled = false;
+                deleteResume.innerHTML = '<span class="material-icons">delete</span>';
             }
         });
 
         // Logout handler
         logoutBtn.addEventListener('click', () => {
-            localStorage.removeItem('token');
-            localStorage.removeItem('userType');
+            try {
+                localStorage.removeItem('token');
+                localStorage.removeItem('userType');
+            } catch (error) {
+                console.error('Storage access error:', error);
+            }
             window.location.href = '/';
         });
+
+        // Hide "Post Job" link for job seekers
+        if (userType === 'job_seeker') {
+            const postJobLink = document.querySelector('a[href="/post-job.html"]');
+            if (postJobLink) {
+                postJobLink.parentElement.style.display = 'none';
+            }
+        }
+
+        // Add styles for the resume link
+        const resumeStyles = document.createElement('style');
+        resumeStyles.textContent = `
+            .current-resume a {
+                color: #00E676;
+                text-decoration: none;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 16px;
+                border-radius: 4px;
+                transition: all 0.3s ease;
+            }
+            .current-resume a:hover {
+                background: rgba(0, 230, 118, 0.1);
+                text-decoration: underline;
+            }
+            .current-resume .material-icons {
+                font-size: 20px;
+            }
+        `;
+        document.head.appendChild(resumeStyles);
     </script>
 </body>
 </html>

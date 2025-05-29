@@ -248,6 +248,77 @@ body::before {
     gap: 0.5rem;
 }
 
+/* Settings card style */
+.settings-card {
+    background: #23265a;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+    padding: 32px 24px;
+    max-width: 500px;
+    margin: 40px auto;
+    color: var(--text-color);
+}
+
+.settings-card h1 {
+    font-size: 2rem;
+    margin-bottom: 12px;
+}
+
+.settings-section h2 {
+    color: var(--error-color);
+    font-size: 1.2rem;
+    margin-bottom: 8px;
+}
+
+/* Danger button style */
+.danger-btn {
+    background: var(--error-color);
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s;
+}
+
+.danger-btn:hover {
+    background: #d32f2f;
+}
+
+/* Auth Card */
+.auth-card {
+    max-height: 90vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--success-color) #23265a; /* Changed to green */
+}
+
+/* For Webkit browsers (Chrome, Edge, Safari) */
+.auth-card::-webkit-scrollbar {
+    width: 8px;
+    background: #23265a;
+    border-radius: 8px;
+}
+
+.auth-card::-webkit-scrollbar-thumb {
+    background: var(--success-color); /* Changed to green */
+    border-radius: 8px;
+}
+
+.auth-card::-webkit-scrollbar-thumb:hover {
+    background: #388e3c; /* A darker green for hover */
+}
+
+/* Signup Card */
+.signup-card {
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {
@@ -263,4 +334,4 @@ body::before {
         margin: 1rem;
         padding: 1rem;
     }
-} 
+}
