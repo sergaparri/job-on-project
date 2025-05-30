@@ -1164,59 +1164,117 @@ apiRouter.put('/user-notifications/:id/read', authenticateToken, (req, res) => {
 });
 
 // Delete a notification by ID (and its comments)
-apiRouter.delete('/notifications/:id', authenticateToken, (req, res) => {
+apiRouter.delete('/notifications/:id', authenticateToken, async (req, res) => {
     const notificationId = req.params.id;
     const userId = req.user.id;
-    const userType = req.user.user_type;
+    let connection;
 
-    // Only employer or applicant involved can delete
-    const accessQuery = `
-        SELECT * FROM notifications 
-        WHERE id = ? AND (employer_id = ? OR applicant_id = ?)
-    `;
-    pool.getConnection().then(connection => connection.execute(accessQuery, [notificationId, userId, userId])).then(([results]) => {
-        if (results.length === 0) {
+    try {
+        connection = await pool.getConnection();
+
+        // Only employer or applicant involved can delete
+        const [accessResults] = await connection.execute(
+            'SELECT * FROM notifications WHERE id = ? AND (employer_id = ? OR applicant_id = ?)',
+            [notificationId, userId, userId]
+        );
+
+        if (accessResults.length === 0) {
             return res.status(403).json({ error: 'Access denied' });
         }
 
-        // Delete notification (comments will cascade if FK is set)
-        connection.execute('DELETE FROM notifications WHERE id = ?', [notificationId]).then(() => {
-            res.json({ message: 'Notification deleted successfully' });
-        }).catch((err) => {
-            console.error('Database error:', err);
-            res.status(500).json({ error: 'Failed to delete notification' });
-        });
-    }).catch((err) => {
-        console.error('Database error:', err);
-        res.status(500).json({ error: 'Failed to verify access' });
-    });
+        // Start transaction
+        await connection.beginTransaction();
+
+        // Delete comments first (due to foreign key constraints)
+        await connection.execute('DELETE FROM comments WHERE notification_id = ?', [notificationId]);
+
+        // Delete notification
+        const [result] = await connection.execute('DELETE FROM notifications WHERE id = ?', [notificationId]);
+
+        if (result.affectedRows === 0) {
+            throw new Error('Failed to delete notification');
+        }
+
+        // Commit transaction
+        await connection.commit();
+
+        res.json({ message: 'Notification deleted successfully' });
+    } catch (error) {
+        if (connection) {
+            await connection.rollback();
+        }
+        console.error('Database error:', error);
+        res.status(500).json({ error: 'Failed to delete notification' });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
 });
 
 // Delete a comment by ID
-apiRouter.delete('/notifications/:notificationId/comments/:commentId', authenticateToken, (req, res) => {
+apiRouter.delete('/notifications/:notificationId/comments/:commentId', authenticateToken, async (req, res) => {
     const { notificationId, commentId } = req.params;
     const userId = req.user.id;
+    let connection;
 
-    // Only comment owner or system/admin can delete
-    const accessQuery = `
-        SELECT * FROM comments 
-        WHERE id = ? AND notification_id = ? AND user_id = ?
-    `;
-    pool.getConnection().then(connection => connection.execute(accessQuery, [commentId, notificationId, userId])).then(([results]) => {
-        if (results.length === 0) {
-            return res.status(403).json({ error: 'Access denied' });
+    try {
+        connection = await pool.getConnection();
+
+        // Verify user has access to this notification
+        const [accessResults] = await connection.execute(
+            'SELECT * FROM notifications WHERE id = ? AND (employer_id = ? OR applicant_id = ?)',
+            [notificationId, userId, userId]
+        );
+
+        if (accessResults.length === 0) {
+            return res.status(403).json({ error: 'Access denied to notification' });
         }
 
-        connection.execute('DELETE FROM comments WHERE id = ?', [commentId]).then(() => {
-            res.json({ message: 'Comment deleted successfully' });
-        }).catch((err) => {
-            console.error('Database error:', err);
-            res.status(500).json({ error: 'Failed to delete comment' });
-        });
-    }).catch((err) => {
-        console.error('Database error:', err);
-        res.status(500).json({ error: 'Failed to verify access' });
-    });
+        // Verify comment exists and belongs to the user
+        const [commentResults] = await connection.execute(
+            'SELECT * FROM comments WHERE id = ? AND notification_id = ? AND user_id = ?',
+            [commentId, notificationId, userId]
+        );
+
+        if (commentResults.length === 0) {
+            return res.status(403).json({ error: 'Comment not found or access denied' });
+        }
+
+        // Start transaction
+        await connection.beginTransaction();
+
+        // Delete any replies to this comment first
+        await connection.execute(
+            'DELETE FROM comments WHERE notification_id = ? AND parent_id = ?',
+            [notificationId, commentId]
+        );
+
+        // Delete the comment
+        const [result] = await connection.execute(
+            'DELETE FROM comments WHERE id = ? AND notification_id = ?',
+            [commentId, notificationId]
+        );
+
+        if (result.affectedRows === 0) {
+            throw new Error('Failed to delete comment');
+        }
+
+        // Commit transaction
+        await connection.commit();
+
+        res.json({ message: 'Comment deleted successfully' });
+    } catch (error) {
+        if (connection) {
+            await connection.rollback();
+        }
+        console.error('Database error:', error);
+        res.status(500).json({ error: 'Failed to delete comment' });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
 });
 
 // Delete account endpoint

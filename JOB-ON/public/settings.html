@@ -44,106 +44,6 @@
             <div class="settings-container">
                 <h1>Settings</h1>
                 
-                <!-- Account Settings -->
-                <section class="settings-section">
-                    <h2>Account Settings</h2>
-                    <form id="accountSettingsForm" class="settings-form">
-                        <div class="form-group">
-                            <label for="email">Email</label>
-                            <input type="email" id="email" name="email" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="currentPassword">Current Password</label>
-                            <div class="password-input">
-                                <input type="password" id="currentPassword" name="currentPassword">
-                                <button type="button" class="toggle-password">
-                                    <span class="material-icons">visibility_off</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="newPassword">New Password</label>
-                            <div class="password-input">
-                                <input type="password" id="newPassword" name="newPassword">
-                                <button type="button" class="toggle-password">
-                                    <span class="material-icons">visibility_off</span>
-                                </button>
-                            </div>
-                            <div class="password-strength">
-                                <div class="password-strength-bar"></div>
-                            </div>
-                        </div>
-                        <button type="submit" class="save-btn">
-                            <span class="material-icons">save</span>
-                            Save Changes
-                        </button>
-                    </form>
-                </section>
-
-                <!-- Notification Settings -->
-                <section class="settings-section">
-                    <h2>Notification Preferences</h2>
-                    <form id="notificationSettingsForm" class="settings-form">
-                        <div class="form-group checkbox-group">
-                            <label>
-                                <input type="checkbox" name="emailNotifications" checked>
-                                Email Notifications
-                            </label>
-                            <p class="setting-description">Receive notifications via email</p>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <label>
-                                <input type="checkbox" name="pushNotifications" checked>
-                                Push Notifications
-                            </label>
-                            <p class="setting-description">Receive notifications in your browser</p>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <label>
-                                <input type="checkbox" name="jobAlerts" checked>
-                                Job Alerts
-                            </label>
-                            <p class="setting-description">Get notified about new job postings</p>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <label>
-                                <input type="checkbox" name="applicationUpdates" checked>
-                                Application Updates
-                            </label>
-                            <p class="setting-description">Get notified about your job applications</p>
-                        </div>
-                        <button type="submit" class="save-btn">
-                            <span class="material-icons">save</span>
-                            Save Preferences
-                        </button>
-                    </form>
-                </section>
-
-                <!-- Privacy Settings -->
-                <section class="settings-section">
-                    <h2>Privacy Settings</h2>
-                    <form id="privacySettingsForm" class="settings-form">
-                        <div class="form-group checkbox-group">
-                            <label>
-                                <input type="checkbox" name="profileVisibility" checked>
-                                Public Profile
-                            </label>
-                            <p class="setting-description">Make your profile visible to employers</p>
-                        </div>
-                        <div class="form-group checkbox-group">
-                            <label>
-                                <input type="checkbox" name="resumeVisibility" checked>
-                                Resume Visibility
-                            </label>
-                            <p class="setting-description">Allow employers to view your resume</p>
-                        </div>
-                        <button type="submit" class="save-btn">
-                            <span class="material-icons">save</span>
-                            Save Privacy Settings
-                        </button>
-                    </form>
-                </section>
-
                 <!-- Danger Zone -->
                 <section class="settings-section danger-zone">
                     <h2>Danger Zone</h2>
@@ -180,9 +80,6 @@
         // DOM Elements
         const menuToggle = document.getElementById('menuToggle');
         const sidebar = document.getElementById('sidebar');
-        const accountSettingsForm = document.getElementById('accountSettingsForm');
-        const notificationSettingsForm = document.getElementById('notificationSettingsForm');
-        const privacySettingsForm = document.getElementById('privacySettingsForm');
         const deleteAccountBtn = document.getElementById('deleteAccountBtn');
         const deleteAccountModal = document.getElementById('deleteAccountModal');
         const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
@@ -201,162 +98,6 @@
                 !menuToggle.contains(e.target)) {
                 sidebar.classList.remove('active');
                 document.body.classList.remove('menu-open');
-            }
-        });
-
-        // Toggle password visibility
-        document.querySelectorAll('.toggle-password').forEach(button => {
-            button.addEventListener('click', () => {
-                const input = button.previousElementSibling;
-                const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
-                input.setAttribute('type', type);
-                button.querySelector('.material-icons').textContent = 
-                    type === 'password' ? 'visibility_off' : 'visibility';
-            });
-        });
-
-        // Password strength indicator
-        const newPasswordInput = document.getElementById('newPassword');
-        const strengthBar = document.querySelector('.password-strength-bar');
-
-        newPasswordInput.addEventListener('input', () => {
-            const password = newPasswordInput.value;
-            let strength = 0;
-            
-            if (password.length >= 8) strength++;
-            if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
-            if (password.match(/\d/)) strength++;
-            if (password.match(/[^a-zA-Z\d]/)) strength++;
-
-            strengthBar.className = 'password-strength-bar';
-            if (strength <= 1) strengthBar.classList.add('weak');
-            else if (strength <= 2) strengthBar.classList.add('medium');
-            else strengthBar.classList.add('strong');
-        });
-
-        // Load user settings
-        async function loadSettings() {
-            try {
-                const response = await fetch('/api/settings', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json'
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to load settings');
-                }
-
-                const settings = await response.json();
-                
-                // Populate account settings
-                document.getElementById('email').value = settings.email;
-
-                // Populate notification settings
-                document.querySelector('input[name="emailNotifications"]').checked = settings.notifications.email;
-                document.querySelector('input[name="pushNotifications"]').checked = settings.notifications.push;
-                document.querySelector('input[name="jobAlerts"]').checked = settings.notifications.jobAlerts;
-                document.querySelector('input[name="applicationUpdates"]').checked = settings.notifications.applicationUpdates;
-
-                // Populate privacy settings
-                document.querySelector('input[name="profileVisibility"]').checked = settings.privacy.profileVisibility;
-                document.querySelector('input[name="resumeVisibility"]').checked = settings.privacy.resumeVisibility;
-
-            } catch (error) {
-                console.error('Error loading settings:', error);
-                showError('Failed to load settings. Please try again later.');
-            }
-        }
-
-        // Save account settings
-        accountSettingsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(accountSettingsForm);
-            
-            try {
-                const response = await fetch('/api/settings/account', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        email: formData.get('email'),
-                        currentPassword: formData.get('currentPassword'),
-                        newPassword: formData.get('newPassword')
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to update account settings');
-                }
-
-                showSuccess('Account settings updated successfully');
-                formData.get('currentPassword') && formData.get('newPassword') && accountSettingsForm.reset();
-            } catch (error) {
-                console.error('Error updating account settings:', error);
-                showError('Failed to update account settings. Please try again.');
-            }
-        });
-
-        // Save notification settings
-        notificationSettingsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(notificationSettingsForm);
-            
-            try {
-                const response = await fetch('/api/settings/notifications', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        emailNotifications: formData.get('emailNotifications') === 'on',
-                        pushNotifications: formData.get('pushNotifications') === 'on',
-                        jobAlerts: formData.get('jobAlerts') === 'on',
-                        applicationUpdates: formData.get('applicationUpdates') === 'on'
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to update notification settings');
-                }
-
-                showSuccess('Notification preferences updated successfully');
-            } catch (error) {
-                console.error('Error updating notification settings:', error);
-                showError('Failed to update notification settings. Please try again.');
-            }
-        });
-
-        // Save privacy settings
-        privacySettingsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(privacySettingsForm);
-            
-            try {
-                const response = await fetch('/api/settings/privacy', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        profileVisibility: formData.get('profileVisibility') === 'on',
-                        resumeVisibility: formData.get('resumeVisibility') === 'on'
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to update privacy settings');
-                }
-
-                showSuccess('Privacy settings updated successfully');
-            } catch (error) {
-                console.error('Error updating privacy settings:', error);
-                showError('Failed to update privacy settings. Please try again.');
             }
         });
 
@@ -387,23 +128,9 @@
                 window.location.href = '/login.html';
             } catch (error) {
                 console.error('Error deleting account:', error);
-                showError('Failed to delete account. Please try again.');
+                alert('Failed to delete account. Please try again.');
             }
         });
-
-        // Utility functions
-        function showSuccess(message) {
-            // Implement success notification
-            console.log('Success:', message);
-        }
-
-        function showError(message) {
-            // Implement error notification
-            console.error('Error:', message);
-        }
-
-        // Load settings when page loads
-        loadSettings();
     </script>
 </body>
 </html>

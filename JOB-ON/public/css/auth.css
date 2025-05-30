@@ -178,16 +178,14 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: -0.5rem;
+    margin-bottom: 20px;
 }
 
 .remember-me {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 8px;
     cursor: pointer;
-    color: rgba(255, 255, 255, 0.7);
-    user-select: none;
 }
 
 .remember-me input[type="checkbox"] {
@@ -197,24 +195,28 @@
 .checkmark {
     width: 18px;
     height: 18px;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    border: 2px solid #ccc;
     border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: inline-block;
+    position: relative;
     transition: all 0.3s ease;
 }
 
 .remember-me input[type="checkbox"]:checked + .checkmark {
-    background: #00E676;
-    border-color: #00E676;
+    background-color: #4CAF50;
+    border-color: #4CAF50;
 }
 
-.remember-me input[type="checkbox"]:checked + .checkmark::after {
-    content: '✓';
-    color: #14183E;
-    font-size: 12px;
-    font-weight: bold;
+.remember-me input[type="checkbox"]:checked + .checkmark:after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 2px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
 }
 
 .forgot-password {
@@ -402,25 +404,6 @@
     font-size: 24px;
     color: rgba(255, 255, 255, 0.5);
     transition: color 0.3s ease;
-}
-
-/* Terms Checkbox */
-.terms {
-    margin-top: 1rem;
-}
-
-.terms .remember-me {
-    color: rgba(255, 255, 255, 0.9);
-}
-
-.terms-link {
-    color: #00E676;
-    text-decoration: none;
-    transition: color 0.3s ease;
-}
-
-.terms-link:hover {
-    color: #00ff85;
 }
 
 /* Responsive Design for Signup */
