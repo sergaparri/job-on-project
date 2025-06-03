@@ -866,6 +866,7 @@ apiRouter.get('/jobs', async (req, res) => {
         
         const jobs = results.map(job => ({
             id: job.id,
+            user_id: job.user_id,
             title: job.job_title,
             description: job.job_description,
             location: job.job_location,
@@ -1413,6 +1414,55 @@ apiRouter.post('/update-employer-profile', authenticateToken, async (req, res) =
         }
         console.error('Error updating employer profile:', error);
         res.status(500).json({ error: 'Failed to update profile' });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
+});
+
+// Delete job endpoint
+apiRouter.delete('/jobs/:id', authenticateToken, async (req, res) => {
+    const jobId = req.params.id;
+    const userId = req.user.id;
+    let connection;
+
+    try {
+        connection = await pool.getConnection();
+
+        // Verify user is the job poster
+        const [jobResults] = await connection.execute(
+            'SELECT * FROM jobs WHERE id = ? AND user_id = ?',
+            [jobId, userId]
+        );
+
+        if (jobResults.length === 0) {
+            return res.status(403).json({ error: 'Access denied or job not found' });
+        }
+
+        // Start transaction
+        await connection.beginTransaction();
+
+        // Delete related notifications first
+        await connection.execute('DELETE FROM notifications WHERE job_id = ?', [jobId]);
+
+        // Delete the job
+        const [result] = await connection.execute('DELETE FROM jobs WHERE id = ?', [jobId]);
+
+        if (result.affectedRows === 0) {
+            throw new Error('Failed to delete job');
+        }
+
+        // Commit transaction
+        await connection.commit();
+
+        res.json({ message: 'Job deleted successfully' });
+    } catch (error) {
+        if (connection) {
+            await connection.rollback();
+        }
+        console.error('Error deleting job:', error);
+        res.status(500).json({ error: 'Failed to delete job' });
     } finally {
         if (connection) {
             connection.release();

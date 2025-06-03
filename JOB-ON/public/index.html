@@ -72,11 +72,17 @@
     <template id="jobCardTemplate">
         <div class="job-card">
             <div class="job-card-header">
-                <h2 class="job-title"></h2>
-                <span class="job-location">
-                    <span class="material-icons">location_on</span>
-                    <span class="location-text"></span>
-                </span>
+                <div class="job-header-content">
+                    <h2 class="job-title"></h2>
+                    <span class="job-location">
+                        <span class="material-icons">location_on</span>
+                        <span class="location-text"></span>
+                    </span>
+                </div>
+                <button class="delete-btn" style="display: none;">
+                    <span class="material-icons">delete</span>
+                    Delete Post
+                </button>
             </div>
             
             <div class="company-info">
@@ -190,17 +196,94 @@
 
             // Add apply button handler
             const applyBtn = card.querySelector('.apply-btn');
+            const deleteBtn = card.querySelector('.delete-btn');
             if (applyBtn) {
                 // Get current user's ID from token
                 const token = localStorage.getItem('token');
                 const payload = JSON.parse(atob(token.split('.')[1]));
                 const currentUserId = payload.id;
 
-                // Hide apply button if current user is the job poster
-                if (currentUserId === job.employer.id) {
+                // Show delete button and hide apply button if current user is the job poster
+                if (currentUserId === job.user_id) {
+                    console.log('Showing delete button for job:', job.id);
                     applyBtn.style.display = 'none';
+                    deleteBtn.style.display = 'flex';
+                    
+                    // Add delete button handler
+                    deleteBtn.dataset.jobId = job.id;
+                    deleteBtn.addEventListener('click', async () => {
+                        if (!confirm('Are you sure you want to delete this job posting?')) {
+                            return;
+                        }
+
+                        try {
+                            const jobId = deleteBtn.dataset.jobId;
+                            console.log('Deleting job:', jobId);
+                            
+                            // Disable button and show loading state
+                            deleteBtn.disabled = true;
+                            deleteBtn.innerHTML = '<span class="material-icons rotating">refresh</span> Deleting...';
+
+                            const response = await fetch(`/api/jobs/${jobId}`, {
+                                method: 'DELETE',
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Content-Type': 'application/json'
+                                }
+                            });
+
+                            if (!response.ok) {
+                                const data = await response.json();
+                                throw new Error(data.error || 'Failed to delete job');
+                            }
+
+                            // Remove the job card with a fade out animation
+                            const jobCard = deleteBtn.closest('.job-card');
+                            jobCard.style.opacity = '0';
+                            jobCard.style.transition = 'opacity 0.3s ease-out';
+                            
+                            setTimeout(() => {
+                                jobCard.remove();
+                                
+                                // Check if there are any jobs left
+                                if (jobsList.children.length === 0) {
+                                    jobsList.innerHTML = `
+                                        <div class="no-jobs">
+                                            <span class="material-icons">work_off</span>
+                                            <p>No jobs available at the moment</p>
+                                            <a href="/post-job.html" class="post-job-btn">
+                                                <span class="material-icons">add</span>
+                                                Post Your First Job
+                                            </a>
+                                        </div>
+                                    `;
+                                }
+                            }, 300);
+
+                        } catch (error) {
+                            console.error('Delete Error:', error);
+                            
+                            // Show error message
+                            const errorMessage = document.createElement('div');
+                            errorMessage.className = 'error-message';
+                            errorMessage.innerHTML = `
+                                <span class="material-icons">error_outline</span>
+                                ${error.message}
+                            `;
+                            deleteBtn.parentElement.appendChild(errorMessage);
+
+                            // Reset button state
+                            deleteBtn.disabled = false;
+                            deleteBtn.innerHTML = '<span class="material-icons">delete</span> Delete Job';
+
+                            // Remove error message after 3 seconds
+                            setTimeout(() => {
+                                errorMessage.remove();
+                            }, 3000);
+                        }
+                    });
                 } else {
-                    // Store job ID as a data attribute
+                    // Store job ID as a data attribute for apply button
                     applyBtn.dataset.jobId = job.id;
                     
                     applyBtn.addEventListener('click', async () => {
