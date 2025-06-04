@@ -612,11 +612,12 @@ apiRouter.put('/notifications/:id/status', authenticateToken, async (req, res) =
         // Start transaction
         await connection.beginTransaction();
 
-        // First get the notification details including applicant info
+        // First get the notification details including applicant info and job details
         const getDetailsQuery = `
             SELECT 
                 n.*,
                 j.job_title,
+                j.number_of_people,
                 u.email as applicant_email,
                 u.first_name as applicant_first_name,
                 u.last_name as applicant_last_name,
@@ -643,6 +644,11 @@ apiRouter.put('/notifications/:id/status', authenticateToken, async (req, res) =
         const notificationDetails = detailsResults[0];
         console.log('Found notification:', notificationDetails);
 
+        // If status is accepted, check if there are still positions available
+        if (status === 'accepted' && notificationDetails.number_of_people <= 0) {
+            return res.status(400).json({ error: 'No more positions available for this job' });
+        }
+
         // Update the notification status
         const updateQuery = 'UPDATE notifications SET status = ? WHERE id = ? AND employer_id = ?';
         console.log('Updating notification status...');
@@ -652,6 +658,12 @@ apiRouter.put('/notifications/:id/status', authenticateToken, async (req, res) =
         if (updateResult.affectedRows === 0) {
             console.error('No rows affected in status update');
             return res.status(404).json({ error: 'Failed to update notification status - no matching record found' });
+        }
+
+        // If status is accepted, decrement the number_of_people
+        if (status === 'accepted') {
+            const updateJobQuery = 'UPDATE jobs SET number_of_people = number_of_people - 1 WHERE id = ?';
+            await connection.execute(updateJobQuery, [notificationDetails.job_id]);
         }
 
         // Create a system message in comments

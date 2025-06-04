@@ -315,6 +315,20 @@
                 // Refresh the notifications list
                 await loadNotifications();
                 await loadUserNotifications();
+
+                // If status is accepted, refresh the jobs list on the homepage
+                if (status === 'accepted') {
+                    // Check if we're on the homepage
+                    if (window.location.pathname === '/') {
+                        // Refresh the jobs list
+                        if (typeof fetchJobs === 'function') {
+                            await fetchJobs();
+                        }
+                    } else {
+                        // If we're not on the homepage, open it in a new tab
+                        window.open('/', '_blank');
+                    }
+                }
             } catch (error) {
                 console.error('Error updating status:', error);
                 alert(error.message || 'Failed to update application status. Please try again.');
