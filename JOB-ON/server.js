@@ -968,11 +968,18 @@ apiRouter.get('/my-jobs', authenticateToken, async (req, res) => {
         const query = `
             SELECT 
                 j.*,
+                u.first_name,
+                u.last_name,
+                u.email,
+                p.company_name,
+                p.company_description,
                 COUNT(n.id) as total_applications,
                 COUNT(CASE WHEN n.status = 'pending' THEN 1 END) as pending_applications,
                 COUNT(CASE WHEN n.status = 'accepted' THEN 1 END) as accepted_applications,
                 COUNT(CASE WHEN n.status = 'rejected' THEN 1 END) as rejected_applications
             FROM jobs j
+            JOIN users u ON j.user_id = u.id
+            LEFT JOIN profiles p ON u.id = p.user_id
             LEFT JOIN notifications n ON j.id = n.job_id
             WHERE j.user_id = ?
             GROUP BY j.id
@@ -984,6 +991,7 @@ apiRouter.get('/my-jobs', authenticateToken, async (req, res) => {
         
         const jobs = results.map(job => ({
             id: job.id,
+            user_id: job.user_id,
             title: job.job_title,
             description: job.job_description,
             location: job.job_location,
@@ -991,6 +999,14 @@ apiRouter.get('/my-jobs', authenticateToken, async (req, res) => {
             salaryRange: {
                 min: job.min_salary,
                 max: job.max_salary
+            },
+            company: {
+                name: job.company_name,
+                description: job.company_description
+            },
+            employer: {
+                name: `${job.first_name} ${job.last_name}`,
+                email: job.email
             },
             applications: {
                 total: job.total_applications,
