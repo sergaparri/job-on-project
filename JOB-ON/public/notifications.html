@@ -15,6 +15,10 @@
         <nav class="sidebar">
             <div class="logo">
                 <img src="images/logo.svg" alt="JOB-ON" class="nav-logo">
+                <div class="user-info">
+                    <span class="user-name"></span>
+                    <span class="user-type"></span>
+                </div>
             </div>
             <ul class="nav-links">
                 <li>
@@ -105,6 +109,32 @@
         // DOM Elements
         const notificationsList = document.getElementById('notificationsList');
         const filterButtons = document.querySelectorAll('.filter-btn');
+        const userNameElement = document.querySelector('.user-name');
+        const userTypeElement = document.querySelector('.user-type');
+
+        // Fetch user profile
+        async function fetchUserProfile() {
+            try {
+                const response = await fetch('/api/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load profile');
+                }
+
+                const data = await response.json();
+                userNameElement.textContent = `${data.firstName} ${data.lastName}`;
+                userTypeElement.textContent = data.userType === 'employer' ? 'Employer' : 'Job Seeker';
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // Load user profile when page loads
+        fetchUserProfile();
 
         // Update page title based on user type
         const pageTitle = document.querySelector('.notifications-header h1');
